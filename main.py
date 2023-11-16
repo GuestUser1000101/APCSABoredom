@@ -19,6 +19,8 @@ mousehold = 0
 velocityTime = [(0, 0)] * 400
 
 alphabet = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
+for letter in alphabet:
+    exec(f"{letter}_tick = 0")
 
 def sign(num):
     if num > 0:
@@ -117,6 +119,8 @@ class Projectile:
         self.remove = False
         self.radius = 1
         self.buffer = 5
+        self.type = projectileType
+        self.bounceOnWall = False
         Entity.currentIndex += 1
 
     def conditionalRemove(self):
@@ -124,7 +128,7 @@ class Projectile:
 
     @staticmethod
     def summonByVector(x, y, angle, vel, acc = 0, projectileType = "noAI", owner = -1):
-        Projectile.projectiles.append(x, y, vel * math.cos(angle), vel * math.sin(angle), acc * math.cos(angle), vel * math.sin(angle), projectileType, owner)
+        Projectile.projectiles.append(Projectile(x, y, vel * math.cos(angle), vel * math.sin(angle), acc * math.cos(angle), vel * math.sin(angle), projectileType, owner))
 
     def render(self):
         pygame.draw.circle(screen, (0, 255, 255), self.pos.array(), self.radius)
@@ -137,12 +141,16 @@ class Projectile:
         self.vel.add(self.acc)
         self.pos.add(self.vel)
 
-        if self.pos.x > width or self.pos.x < 0:
-            self.pos.x -= self.vel.x
-            self.vel.x = -self.vel.x
-        if self.pos.y > height or self.pos.y < 0:
-            self.pos.y -= self.vel.y
-            self.vel.y = -self.vel.y
+        if self.bounceOnWall:
+            if self.pos.x > width or self.pos.x < 0:
+                self.pos.x -= self.vel.x
+                self.vel.x = -self.vel.x
+            if self.pos.y > height or self.pos.y < 0:
+                self.pos.y -= self.vel.y
+                self.vel.y = -self.vel.y
+        else:
+            if self.pos.x > width or self.pos.x < 0 or self.pos.y > height or self.pos.y < 0:
+                self.remove = True
 
     def noAI(self):
         pass
@@ -164,6 +172,7 @@ class Entity:
         self.color = (255, 0, 0) if self.type == "basic" else (0, 255, 0)
         self.index = Entity.currentIndex
         self.radius = 2
+        self.projectileVulnerable = True
         Entity.currentIndex += 1
 
     def moveTowards(self, vector):
@@ -171,17 +180,20 @@ class Entity:
         self.acc.y = vector.y - self.pos.y
         self.acc.normalize(self.maxAcc)
 
-    def moveAwayMultiple(self, vectors):
+    def moveAwayMultiple(self, vectors, radius = -1):
         if len(vectors) != 0:
             differenceVectors = []
+            distances = []
             for vector in vectors:
                 differenceVectors.append(self.pos.difference(vector))
+                distances.append(distance(self.pos, vector))
             largestThreatMultiplier = 0
             largestAngle = 0
             for angle in range(0, 360, 45):
                 threatMultiplier = 1
-                for vector in differenceVectors:
-                    threatMultiplier = smallestAngleDifference(vector.angle(), toRadians(angle)) * 180 / math.pi * threatMultiplier
+                for i in range(len(vectors)):
+                    distanceMultiplier = math.floor((radius + 1) / (distances[i] + 1)) if radius != -1 else 1
+                    threatMultiplier = smallestAngleDifference(differenceVectors[i].angle(), toRadians(angle)) * 180 / math.pi * threatMultiplier
                 if threatMultiplier > largestThreatMultiplier:
                     largestThreatMultiplier = threatMultiplier
                     largestAngle = angle
@@ -229,14 +241,20 @@ class Entity:
                 targets.append(entity.pos)
         return targets
 
-    def findClosestWall(self, radius = -1):
-        wallX = width if self.pos.x > width / 2 else 0
-        wallY = height if self.pos.y > height / 2 else 0
+    def findClosestWall(self, buffer = 0):
+        wallX = width + buffer if self.pos.x > width / 2 else -buffer
+        wallY = height + buffer if self.pos.y > height / 2 else -buffer
 
         if abs(self.pos.x - wallX) < abs(self.pos.y - wallY):
             return Vector(wallX, self.pos.y)
         else:
             return Vector(self.pos.x, wallY)
+
+    def findClosestCorner(self, buffer = 0):
+        cornerX = width + buffer if self.pos.x > width / 2 else -buffer
+        cornerY = height + buffer if self.pos.y > height / 2 else -buffer
+
+        return Vector(cornerX, cornerY)
 
     def checkProjectileCollision(self):
         for projectile in Projectile:
@@ -280,7 +298,8 @@ class Entity:
             distanceY = self.target.pos.y - self.pos.y
 
             if distanceToPlayer < 4:
-                self.remove = True
+                pass
+                #self.remove = True
             elif distanceToTarget < 200:
                 self.moveTowards(self.target.pos.shuffledVector(10))
                 if abs(distanceX) < abs(displacement(self.maxAcc, self.vel.x, self.target.vel.x)):
@@ -292,12 +311,22 @@ class Entity:
         else:
             self.stop()
 
+        if self.projectileVulnerable:
+            for projectile in Projectile.projectiles:
+                if distance(projectile.pos, self.pos) <= projectile.radius + self.radius:
+                    self.remove = True
+
 
     def scared(self):
-        targets = self.findPositionTargets(150)
-        closestWall = self.findClosestWall()
+        distanceToPlayer = distance(self.pos, player.pos)
+        
+        targets = self.findPositionTargets(200)
+        closestWall = self.findClosestWall(10)
         if distance(closestWall, self.pos) < 50:
             targets.append(closestWall)
+        closestCorner = self.findClosestCorner(10)
+        if distance(closestCorner, self.pos) < 50:
+            targets.append(closestCorner)
 
         mouseVector = Vector.fromArray(pygame.mouse.get_pos())
         if mousehold == 2 and distance(mouseVector, self.pos) <= 50:
@@ -305,13 +334,17 @@ class Entity:
 
         self.target = self.findClosest("basic")
 
-        if self.target != -1:
+        if distanceToPlayer < 200:
+            targets.append(player.pos)
 
+        if self.target != -1:
             if distance(self.pos, self.target.pos) < 4:
+                self.remove = True
+            if distanceToPlayer < 5:
                 self.remove = True
         
         if len(targets) > 0:
-            self.moveAwayMultiple(targets)
+            self.moveAwayMultiple(targets, 200)
         else:
             self.stop()
 
@@ -335,6 +368,12 @@ class Controller:
             return Vector(wallX, self.pos.y)
         else:
             return Vector(self.pos.x, wallY)
+
+    def findClosestCorner(self):
+        cornerX = width if self.pos.x > width / 2 else 0
+        cornerY = height if self.pos.y > height / 2 else 0
+
+        return Vector(cornerX, cornerY)
         
     def render(self):
         pygame.draw.circle(screen, (255, 255, 255), self.pos.array(), 5)
@@ -413,13 +452,16 @@ def draw():
     #    Entity.entities[-1].maxVel = 0.4
     #    Entity.entities[-1].maxAcc = 0.04
 
-    if q_key:
+    if q_tick == 1:
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "basic"))
         Entity.entities[-1].maxVel = 1 + random.random() * 0.6
         Entity.entities[-1].maxAcc = 0.1
 
-    if e_key:
+    if e_tick == 1:
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "scared"))
+
+    if mousetick:
+        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 5)
         
     player.controller()
     player.update()
@@ -477,8 +519,16 @@ while running:
 
     for letter in alphabet:
         exec(f"{letter}_key = True if keys[pygame.K_{letter}] else False")
-
+        if eval(f"{letter}_key"):
+            exec(f"{letter}_tick = 1 if {letter}_tick == 0 else {letter}_tick")
+        else:
+            exec(f"{letter}_tick = 0 if {letter}_tick == -1 else {letter}_tick")
+    
     draw()
+    
+    for letter in alphabet:
+        exec(f"{letter}_tick = -1 if {letter}_tick == 1 else {letter}_tick")
+    
     mousetick = 0
     pygame.display.update()
     clock.tick(FPS)
