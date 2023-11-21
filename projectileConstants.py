@@ -10,6 +10,7 @@ projectileConstants = {
     "large" : ProjectileTemplate(radius = 5, piercing = True),
     "bouncy" : ProjectileTemplate(bounceOnWall = True),
     "explosion" : ProjectileTemplate(startSpeed = 0),
-    "homing" : ProjectileTemplate(piercing = True),
-    "scatter" : ProjectileTemplate()
+    "homing" : ProjectileTemplate(),
+    "scatter" : ProjectileTemplate(),
+    "missile" : ProjectileTemplate()
 }

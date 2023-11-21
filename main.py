@@ -210,8 +210,11 @@ class Projectile:
         self.radius += 0.1
 
     def explosion(self):
-        self.radius += 1
-        if self.tick > 30:
+        if self.tick < 3:
+            self.radius += 10
+        elif self.tick < 30:
+            self.radius -= 1
+        else:
             self.remove = True
     
     def homing(self):
@@ -241,6 +244,11 @@ class Projectile:
                 Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 36, 0, projectileType = "bouncy")
                 Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 18, 0, projectileType = "bouncy")
                 self.remove = True
+
+    def missile(self):
+        self.homing()
+        if self.remove:
+            Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "explosion")
 
 class Entity:
     entities = []
@@ -545,7 +553,7 @@ def draw():
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "scared"))
 
     if mousetick:
-        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "scatter")
+        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "missile")
         
     player.controller()
     player.update()
