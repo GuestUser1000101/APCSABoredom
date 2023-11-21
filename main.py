@@ -4,7 +4,7 @@ from pygame.locals import *
 import sys
 import random
 import math
-import numpy as np
+from data.projectileConstants import *
 
 clock = pygame.time.Clock()
 FPS = 60
@@ -99,6 +99,9 @@ class Vector:
     def renderPoint(self):
         pygame.draw.circle(screen, (255, 255, 255), self.array(), 5)
 
+    def rotate(self, angle):
+        return Vector.fromAngle(self.angle() + angle, self.magnitude())
+
     @staticmethod
     def fromAngle(angle, magnitude = 1):
         return Vector(math.cos(angle) * magnitude, math.sin(angle) * magnitude)
@@ -117,17 +120,50 @@ class Projectile:
         self.tick = 0
         self.owner = owner
         self.remove = False
-        self.radius = 1
         self.buffer = 5
         self.type = projectileType
-        self.bounceOnWall = False
+        self.radius = projectileConstants[projectileType].radius
+        self.bounceOnWall = projectileConstants[projectileType].bounceOnWall
+        self.piercing = projectileConstants[projectileType].piercing
+        self.index = Projectile.currentIndex
+        self.maxVel = projectileConstants[projectileType].startSpeed
+        self.maxAcc = projectileConstants[projectileType].startSpeed / 5
+        self.bounceCount = 0
+        self.collisionCount = 0
         Entity.currentIndex += 1
 
     def conditionalRemove(self):
         self.remove = True
 
+    def collideWithEntity(self):
+        if not self.piercing:
+            self.remove = True
+        self.collisionCount += 1
+    
+    def findClosest(self, entityType = -1):
+        condition = entityType == entity.type if entityType != -1 else True
+        closestDistance = sys.maxsize
+        closestEntity = -1
+        for entity in Entity.entities:
+            if condition and distance(self.pos, entity.pos) < closestDistance:
+                closestDistance = distance(self.pos, entity.pos)
+                closestEntity = entity
+        return closestEntity
+    
+    def stop(self):
+        self.acc.y = -sign(self.vel.y) * self.maxAcc
+        self.acc.x = -sign(self.vel.x) * self.maxAcc
+
+    def stopX(self):
+        self.acc.x = -sign(self.vel.x) * self.maxAcc
+
+    def stopY(self):
+        self.acc.y = -sign(self.vel.y) * self.maxAcc
+
     @staticmethod
-    def summonByVector(x, y, angle, vel, acc = 0, projectileType = "noAI", owner = -1):
+    def summonByVector(x, y, angle, vel = 0, acc = 0, projectileType = "noAI", owner = -1):
+        if vel == 0:
+            vel = projectileConstants[projectileType].startSpeed
         Projectile.projectiles.append(Projectile(x, y, vel * math.cos(angle), vel * math.sin(angle), acc * math.cos(angle), vel * math.sin(angle), projectileType, owner))
 
     def render(self):
@@ -138,22 +174,73 @@ class Projectile:
         
         self.tick += 1
 
+        if self.acc.magnitude() > self.maxAcc:
+            self.acc.normalize(self.maxAcc)
+
         self.vel.add(self.acc)
+
+        if self.vel.magnitude() > self.maxVel:
+            self.vel.normalize(self.maxVel)
+        elif round(self.vel.magnitude(), 5) < self.maxAcc:
+            self.vel.zero()
+
         self.pos.add(self.vel)
 
         if self.bounceOnWall:
             if self.pos.x > width or self.pos.x < 0:
                 self.pos.x -= self.vel.x
                 self.vel.x = -self.vel.x
+                self.bounceCount += 1
             if self.pos.y > height or self.pos.y < 0:
                 self.pos.y -= self.vel.y
                 self.vel.y = -self.vel.y
+                self.bounceCount += 1
         else:
             if self.pos.x > width or self.pos.x < 0 or self.pos.y > height or self.pos.y < 0:
                 self.remove = True
 
     def noAI(self):
         pass
+
+    def bouncy(self):
+        if self.bounceCount > 3:
+            self.remove = True
+
+    def large(self):
+        self.radius += 0.1
+
+    def explosion(self):
+        self.radius += 1
+        if self.tick > 30:
+            self.remove = True
+    
+    def homing(self):
+        closestEntity = self.findClosest()
+        if closestEntity != -1:
+            distanceToClosest = distance(self.pos, closestEntity.pos)
+            distanceVector = Vector(closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y)
+            distanceVector.normalize(self.maxAcc)
+            distanceX = abs(self.pos.x - closestEntity.pos.x)
+            distanceY = abs(self.pos.y - closestEntity.pos.y)
+            if distanceToClosest < 200:
+                self.acc = distanceVector
+                if abs(distanceX) < abs(displacement(self.maxAcc, self.vel.x, closestEntity.vel.x)):
+                    self.stopX()
+                if abs(distanceY) < abs(displacement(self.maxAcc, self.vel.y, closestEntity.vel.y)):
+                    self.stopY()
+
+    def scatter(self):
+        closestEntity = self.findClosest()
+        if closestEntity != -1:
+            distanceVector = Vector(closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y)
+            self.homing()
+            if distanceVector.magnitude() < 75 and abs(self.vel.angle() - distanceVector.angle()) < math.pi / 36:
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 18, 0, projectileType = "bouncy")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 36, 0, projectileType = "bouncy")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle(), 0, projectileType = "bouncy")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 36, 0, projectileType = "bouncy")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 18, 0, projectileType = "bouncy")
+                self.remove = True
 
 class Entity:
     entities = []
@@ -224,8 +311,7 @@ class Entity:
             if self.index != entity.index and entityType == entity.type and distance(self.pos, entity.pos) < closestDistance:
                 closestDistance = distance(self.pos, entity.pos)
                 closestEntity = entity
-        return closestEntity
-                
+        return closestEntity   
 
     def findTargets(self, radius):
         targets = []
@@ -257,9 +343,9 @@ class Entity:
         return Vector(cornerX, cornerY)
 
     def checkProjectileCollision(self):
-        for projectile in Projectile:
+        for projectile in Projectile.projectiles:
             if projectile.owner != self and distance(projectile.pos, self.pos) <= projectile.radius + self.radius:
-                projectile.conditionalRemove()
+                projectile.collideWithEntity()
                 return True
         return False
     
@@ -312,10 +398,8 @@ class Entity:
             self.stop()
 
         if self.projectileVulnerable:
-            for projectile in Projectile.projectiles:
-                if distance(projectile.pos, self.pos) <= projectile.radius + self.radius:
-                    self.remove = True
-
+            if self.checkProjectileCollision():
+                self.remove = True
 
     def scared(self):
         distanceToPlayer = distance(self.pos, player.pos)
@@ -461,7 +545,7 @@ def draw():
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "scared"))
 
     if mousetick:
-        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 5)
+        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "scatter")
         
     player.controller()
     player.update()
