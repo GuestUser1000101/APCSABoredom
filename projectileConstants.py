@@ -9,7 +9,7 @@ projectileConstants = {
     "noAI" : ProjectileTemplate(),
     "large" : ProjectileTemplate(radius = 5, piercing = True),
     "bouncy" : ProjectileTemplate(bounceOnWall = True),
-    "explosion" : ProjectileTemplate(startSpeed = 0),
+    "explosion" : ProjectileTemplate(startSpeed = 0, piercing = True),
     "homing" : ProjectileTemplate(),
     "scatter" : ProjectileTemplate(),
     "missile" : ProjectileTemplate()
