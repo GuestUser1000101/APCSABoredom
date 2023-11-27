@@ -59,10 +59,36 @@ def toDegrees(angle):
 def toRadians(angle):
     return angle / 180 * math.pi
 
+def colorCheck(color):
+    if type(color) == list or type(color) == tuple:
+        red = colorCheck(color[0])
+        green = colorCheck(color[1])
+        blue = colorCheck(color[2])
+        return (red, green, blue)
+    else:
+        if color > 255:
+            return 255
+        elif color < 0:
+            return 0
+        else:
+            return color
+
+def gradient(color1, color2, percentage, brightnessPercentage = 1):
+    redDiff = color2[0] - color1[0]
+    greenDiff = color2[1] - color1[1]
+    blueDiff = color2[2] - color1[2]
+    return colorCheck((color1[0] * brightnessPercentage + redDiff * percentage,
+                      color1[1] * brightnessPercentage + greenDiff * percentage,
+                      color1[2] * brightnessPercentage + blueDiff * percentage
+    ))
+
 class Vector:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+
+    def __str__(self):
+        return str((self.x, self.y))
 
     def array(self):
         return (self.x, self.y)
@@ -82,6 +108,8 @@ class Vector:
         if distance != 0:
             self.x *= magnitude / distance
             self.y *= magnitude / distance
+            return Vector(self.x, self.y)
+        return Vector(0, 0)
 
     def shuffledVector(self, uncertainty):
         return Vector(self.x + (random.random() - 0.5) * uncertainty, self.y + (random.random() - 0.5) * uncertainty)
@@ -113,7 +141,7 @@ class Vector:
 class Projectile:
     projectiles = []
     currentIndex = 0
-    def __init__(self, x = 0, y = 0, vx = 0, vy = 0, ax = 0, ay = 0, projectileType = "noAI", owner = -1):
+    def __init__(self, x = 0, y = 0, vx = 0, vy = 0, ax = 0, ay = 0, projectileType = "noAI", owner = -1, targetType = -1):
         self.pos = Vector(x, y)
         self.vel = Vector(vx, vy)
         self.acc = Vector(0, 0)
@@ -130,6 +158,8 @@ class Projectile:
         self.maxAcc = projectileConstants[projectileType].startSpeed / 5
         self.bounceCount = 0
         self.collisionCount = 0
+        self.targetType = targetType
+        self.damage = projectileConstants[projectileType].damage
         Entity.currentIndex += 1
 
     def conditionalRemove(self):
@@ -141,10 +171,10 @@ class Projectile:
         self.collisionCount += 1
     
     def findClosest(self, entityType = -1):
-        condition = entityType == entity.type if entityType != -1 else True
         closestDistance = sys.maxsize
         closestEntity = -1
         for entity in Entity.entities:
+            condition = entityType == entity.type if entityType != -1 else True
             if condition and distance(self.pos, entity.pos) < closestDistance:
                 closestDistance = distance(self.pos, entity.pos)
                 closestEntity = entity
@@ -160,11 +190,19 @@ class Projectile:
     def stopY(self):
         self.acc.y = -sign(self.vel.y) * self.maxAcc
 
+    def findTargets(self, radius, entityType = -1):
+        targets = []
+        for entity in Entity.entities:
+            condition = entity.type == entityType if entityType != -1 else True
+            if distance(entity.pos, self.pos) < radius and condition:
+                targets.append(entity)
+        return targets
+
     @staticmethod
-    def summonByVector(x, y, angle, vel = 0, acc = 0, projectileType = "noAI", owner = -1):
+    def summonByVector(x, y, angle, vel = 0, acc = 0, projectileType = "noAI", owner = -1, targetType = -1):
         if vel == 0:
             vel = projectileConstants[projectileType].startSpeed
-        Projectile.projectiles.append(Projectile(x, y, vel * math.cos(angle), vel * math.sin(angle), acc * math.cos(angle), vel * math.sin(angle), projectileType, owner))
+        Projectile.projectiles.append(Projectile(x, y, vel * math.cos(angle), vel * math.sin(angle), acc * math.cos(angle), vel * math.sin(angle), projectileType, owner, targetType))
 
     def render(self):
         pygame.draw.circle(screen, (0, 255, 255), self.pos.array(), self.radius)
@@ -210,15 +248,15 @@ class Projectile:
         self.radius += 0.1
 
     def explosion(self):
-        if self.tick < 3:
-            self.radius += 10
-        elif self.tick < 30:
-            self.radius -= 1
+        if self.tick < 2:
+            self.radius += 12
+        elif self.tick < 8:
+            self.radius -= 3
         else:
             self.remove = True
     
     def homing(self):
-        closestEntity = self.findClosest()
+        closestEntity = self.findClosest(self.targetType)
         if closestEntity != -1:
             distanceToClosest = distance(self.pos, closestEntity.pos)
             distanceVector = Vector(closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y)
@@ -233,20 +271,24 @@ class Projectile:
                     self.stopY()
 
     def scatter(self):
-        closestEntity = self.findClosest()
-        if closestEntity != -1:
+        closestEntity = self.findClosest(self.targetType)
+        if closestEntity != -1 and closestEntity != self.owner:
             distanceVector = Vector(closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y)
             self.homing()
-            if distanceVector.magnitude() < 75 and abs(self.vel.angle() - distanceVector.angle()) < math.pi / 36:
-                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 18, 0, projectileType = "bouncy")
-                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 36, 0, projectileType = "bouncy")
-                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle(), 0, projectileType = "bouncy")
-                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 36, 0, projectileType = "bouncy")
-                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 18, 0, projectileType = "bouncy")
+            if distanceVector.magnitude() < 100 and abs(self.vel.angle() - distanceVector.angle()) < math.pi / 36:
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 9, 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 12, 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 18, 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() + math.pi / 36, 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle(), 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 36, 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 18, 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 12, 0, projectileType = "missile")
+                Projectile.summonByVector(self.pos.x, self.pos.y, self.vel.angle() - math.pi / 9, 0, projectileType = "missile")
                 self.remove = True
 
     def missile(self):
-        self.homing()
+        #self.homing()
         if self.remove:
             Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "explosion")
 
@@ -258,16 +300,22 @@ class Entity:
         self.vel = Vector(0, 0)
         self.acc = Vector(0, 0)
         self.maxAcc = 0.4
-        self.maxVel = random.random() * 2
+        self.maxVel = 2
         self.tick = 0
         self.remove = False
         self.target = 0
         self.type = entityType
         self.invulnerabilityTick = 0
-        self.color = (255, 0, 0) if self.type == "basic" else (0, 255, 0)
+        self.color = (255, 0, 0) if self.type == "basic" or self.type == "shooter" else (0, 255, 0)
         self.index = Entity.currentIndex
         self.radius = 2
         self.projectileVulnerable = True
+        self.shootTick = 0
+        self.shootCooldown = 60
+        self.damageTick = 0
+        self.damageCooldown = 5
+        self.health = 100
+        self.maxHealth = 100
         Entity.currentIndex += 1
 
     def moveTowards(self, vector):
@@ -321,17 +369,19 @@ class Entity:
                 closestEntity = entity
         return closestEntity   
 
-    def findTargets(self, radius):
+    def findTargets(self, radius, entityType = -1):
         targets = []
         for entity in Entity.entities:
-            if self.index != entity.index and distance(entity.pos, self.pos) < radius and entity.type == "basic":
+            condition = entityType == entity.type if entityType != -1 else True
+            if self.index != entity.index and distance(entity.pos, self.pos) < radius and condition:
                 targets.append(entity)
         return targets
 
-    def findPositionTargets(self, radius):
+    def findPositionTargets(self, radius, entityType = -1):
         targets = []
         for entity in Entity.entities:
-            if self.index != entity.index and distance(entity.pos, self.pos) < radius and entity.type == "basic":
+            condition = entityType == entity.type if entityType != -1 else True
+            if self.index != entity.index and distance(entity.pos, self.pos) < radius and condition:
                 targets.append(entity.pos)
         return targets
 
@@ -354,16 +404,35 @@ class Entity:
         for projectile in Projectile.projectiles:
             if projectile.owner != self and distance(projectile.pos, self.pos) <= projectile.radius + self.radius:
                 projectile.collideWithEntity()
+                self.damageRequest(projectile.damage)
                 return True
         return False
     
+    def damageRequest(self, damage):
+        if self.damageTick <= 0:
+            self.health -= damage
+            self.damageTick = self.damageCooldown
+    
     def render(self):
         pygame.draw.circle(screen, self.color, self.pos.array(), self.radius)
+
+    def renderHealth(self):
+        pygame.draw.rect(screen, (50, 50, 50), (self.pos.x - 4, self.pos.y + 4, 8, 2))
+        pygame.draw.rect(screen, gradient((255, 0, 0), (0, 255, 0), self.health / self.maxHealth, 1.3), (self.pos.x - 4, self.pos.y + 4, 7 * self.health / self.maxHealth + 1, 2))
         
     def update(self):
         exec(f'''self.{self.type}()''')
+
+        if self.health <= 0:
+            self.remove = True
+        
+        if self.damageTick > 0:
+            self.damageTick -= 1
         
         self.tick += 1
+
+        if self.shootTick > 0:
+            self.shootTick -= 1
 
         if self.acc.magnitude() > self.maxAcc:
             self.acc.normalize(self.maxAcc)
@@ -412,7 +481,7 @@ class Entity:
     def scared(self):
         distanceToPlayer = distance(self.pos, player.pos)
         
-        targets = self.findPositionTargets(200)
+        targets = self.findPositionTargets(200, "shooter")
         closestWall = self.findClosestWall(10)
         if distance(closestWall, self.pos) < 50:
             targets.append(closestWall)
@@ -424,7 +493,7 @@ class Entity:
         if mousehold == 2 and distance(mouseVector, self.pos) <= 50:
             targets.append(mouseVector)
 
-        self.target = self.findClosest("basic")
+        self.target = self.findClosest("shooter")
 
         if distanceToPlayer < 200:
             targets.append(player.pos)
@@ -436,9 +505,58 @@ class Entity:
                 self.remove = True
         
         if len(targets) > 0:
-            self.moveAwayMultiple(targets, 200)
+            self.moveAwayMultiple(targets, 300)
         else:
             self.stop()
+
+        if self.projectileVulnerable:
+            self.checkProjectileCollision()
+
+    def shooter(self):
+        self.target = self.findClosest("sniper")
+        
+        if self.target != -1:
+            distanceVector = Vector(self.target.pos.x - self.pos.x, self.target.pos.y - self.pos.y)
+            distanceToTarget = distanceVector.magnitude()
+
+            if distanceToTarget < 100:
+                if self.shootTick <= 0:
+                    projectileType = "scatter" if random.randint(1, 100) < 80 else "scatter"
+                    Projectile.summonByVector(self.pos.x, self.pos.y, distanceVector.angle(), 0, 0, projectileType, self, "sniper")
+                    self.shootTick = 30
+
+            if distanceToTarget < 1000 and distanceToTarget > 50:
+                self.moveTowards(self.target.pos.shuffledVector(10))
+            else:
+                self.stop()
+        else:
+            self.stop()
+
+        if self.projectileVulnerable:
+            self.checkProjectileCollision()
+
+    def sniper(self):
+        self.target = self.findClosest("shooter")
+        
+        if self.target != -1:
+            distanceVector = Vector(self.target.pos.x - self.pos.x, self.target.pos.y - self.pos.y)
+            distanceToTarget = distanceVector.magnitude()
+
+            if distanceToTarget < 400:
+                if self.shootTick <= 0:
+                    projectileType = "scatter" if random.randint(1, 100) < 90 else "scatter"
+                    Projectile.summonByVector(self.pos.x, self.pos.y, distanceVector.angle(), 0, 0, projectileType, self, "shooter")
+                    self.shootTick = 15
+
+            if distanceToTarget < 600 and distanceToTarget > 500:
+                self.moveTowards(self.target.pos.shuffledVector(10))
+            else:
+                self.stop()
+        else:
+            self.stop()
+        
+        if self.projectileVulnerable:
+            self.checkProjectileCollision()
 
     def noAI(self):
         pass
@@ -544,17 +662,15 @@ def draw():
     #    Entity.entities[-1].maxVel = 0.4
     #    Entity.entities[-1].maxAcc = 0.04
 
-    if q_tick == 1:
-        Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "basic"))
-        Entity.entities[-1].maxVel = 1 + random.random() * 0.6
-        Entity.entities[-1].maxAcc = 0.1
+    if q_key:
+        Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "shooter"))
 
-    if e_tick == 1:
-        Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "scared"))
+    if e_tick == 1 or r_tick == 1 or t_tick == 1 or y_tick == 1:
+        Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "sniper"))
 
     if mousetick:
-        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "missile")
-        
+        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "scatter")
+
     player.controller()
     player.update()
     player.render()
@@ -580,7 +696,8 @@ def draw():
     for entity in Entity.entities:
         entity.update()
         entity.render()
-        entity.vel.render(entity.pos, 15)
+        entity.renderHealth()
+        #entity.vel.render(entity.pos, 15)
         if not entity.remove:
             entitiesCopy.append(entity)
         else:
