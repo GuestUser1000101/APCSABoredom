@@ -29,6 +29,9 @@ def sign(num):
         return -1
     else:
         return 0
+    
+def boolToSign(bool):
+    return 1 if bool else -1
 
 def graphVelocity():
     for (v, t) in velocityTime:
@@ -52,6 +55,20 @@ def smallestAngleDifference(angle1, angle2):
         return 2 * math.pi - angleDiff
     else:
         return angleDiff
+    
+def positiveAngleEquivalent(angle):
+    if angle < 0:
+        return positiveAngleEquivalent(angle + 2 * math.pi)
+    elif angle >= 2 * math.pi:
+        return positiveAngleEquivalent(angle - 2 * math.pi)
+    else:
+        return angle
+    
+def crossZero(angle1, angle2):
+    angle1 = positiveAngleEquivalent(angle1)
+    angle2 = positiveAngleEquivalent(angle2)
+
+    return abs(angle1 - angle2) > math.pi
 
 def toDegrees(angle):
     return angle / math.pi * 180
@@ -87,6 +104,15 @@ def inBetween(p1, p2, pointer):
 
 def inBetweenOrdered(PMin, PMax, pointer):
     return (PMin <= pointer and PMax >= pointer)
+
+def approachAngle(currentAngle, targetAngle, percentage):
+    currentAngle = positiveAngleEquivalent(currentAngle)
+    targetAngle = positiveAngleEquivalent(targetAngle)
+
+    smallestAngle = smallestAngleDifference(currentAngle, targetAngle)
+    direction = boolToSign(crossZero(currentAngle, targetAngle)) * sign(targetAngle - currentAngle)
+
+    return currentAngle - smallestAngle * direction * percentage
 
 class Vector:
     def __init__(self, x, y):
@@ -426,7 +452,8 @@ class Projectile:
         pass
 
     def energyBeam(self):
-        self.angle += (self.owner.angle - self.angle) / 5
+        self.angle = approachAngle(self.angle, self.owner.angle, 0.3)
+
         if self.tick < 50:
             self.radius += (self.tick // 10) ** 4
             self.diameter += 0.2
@@ -684,9 +711,9 @@ class Entity:
 
             if distanceToTarget < 500:
                 if self.shootTick <= 0:
-                    projectileType = "energyBeam" if random.randint(1, 100) < 80 else "energyBeam"
+                    projectileType = "noAI" if random.randint(1, 100) < 80 else "missile"
                     Projectile.summonByVector(self.pos.x, self.pos.y, distanceVector.angle(), 0, 0, projectileType, self, "sniper")
-                    self.shootTick = 120
+                    self.shootTick = 30
 
             if distanceToTarget < 1000 and distanceToTarget > 50:
                 self.moveTowards(self.target.pos.shuffledVector(10))
@@ -707,9 +734,9 @@ class Entity:
 
             if distanceToTarget < 400:
                 if self.shootTick <= 0:
-                    projectileType = "noAI" if random.randint(1, 100) < 90 else "noAI"
+                    projectileType = "energyBeam" if random.randint(1, 100) < 90 else "energyBeam"
                     Projectile.summonByVector(self.pos.x, self.pos.y, distanceVector.angle(), 0, 0, projectileType, self, "shooter")
-                    self.shootTick = 1000
+                    self.shootTick = 150
 
             if distanceToTarget < 600 and distanceToTarget > 500:
                 self.moveTowards(self.target.pos.shuffledVector(10))
@@ -825,7 +852,7 @@ def draw():
     #    Entity.entities[-1].maxVel = 0.4
     #    Entity.entities[-1].maxAcc = 0.04
 
-    if q_tick == 1:
+    if q_key:
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "shooter"))
 
     if e_tick == 1 or r_tick == 1 or t_tick == 1 or y_tick == 1:

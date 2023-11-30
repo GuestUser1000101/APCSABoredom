@@ -19,5 +19,5 @@ projectileConstants = {
     "missile" : ProjectileTemplate(damage = 0),
     "shockwave" : ProjectileTemplate(startSpeed = 0, piercing =  True, shape = "ring", damage = 10),
     "laser" : ProjectileTemplate(piercing = True, shape = "beam", radius = 10, startSpeed = 10, diameter = 3, damage = 50),
-    "energyBeam" : ProjectileTemplate(piercing = True, shape = "beam", radius = 0, startSpeed = 0, diameter = 0, damage = 20, follow = True)
+    "energyBeam" : ProjectileTemplate(piercing = True, shape = "beam", radius = 0, startSpeed = 0, diameter = 0, damage = 50, follow = True)
 }
