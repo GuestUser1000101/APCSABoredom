@@ -82,6 +82,12 @@ def gradient(color1, color2, percentage, brightnessPercentage = 1):
                       color1[2] * brightnessPercentage + blueDiff * percentage
     ))
 
+def inBetween(p1, p2, pointer):
+    return (pointer >= p1 and pointer <= p2) or (pointer <= p1 and pointer >= p2)
+
+def inBetweenOrdered(PMin, PMax, pointer):
+    return (PMin <= pointer and PMax >= pointer)
+
 class Vector:
     def __init__(self, x, y):
         self.x = x
@@ -97,6 +103,9 @@ class Vector:
         self.x += vec.x
         self.y += vec.y
 
+    def added(self, vec):
+        return Vector(self.x + vec.x, self.y + vec.y)
+
     def difference(self, vec):
         return Vector(vec.x - self.x, vec.y - self.y)
 
@@ -110,6 +119,10 @@ class Vector:
             self.y *= magnitude / distance
             return Vector(self.x, self.y)
         return Vector(0, 0)
+    
+    def normalized(self, magnitude):
+        distance = math.sqrt(self.x ** 2 + self.y ** 2)
+        return Vector(self.x * magnitude / distance, self.y * magnitude / distance) if distance != 0 else Vector(0, 0)
 
     def shuffledVector(self, uncertainty):
         return Vector(self.x + (random.random() - 0.5) * uncertainty, self.y + (random.random() - 0.5) * uncertainty)
@@ -125,6 +138,9 @@ class Vector:
         pygame.draw.line(screen, (255, 255, 255), pos.array(), (pos.x + self.x * multiplier, pos.y + self.y * multiplier))
 
     def renderPoint(self):
+        pygame.draw.circle(screen, (255, 255, 255), (self.x, self.y), 2)
+
+    def renderPoint(self):
         pygame.draw.circle(screen, (255, 255, 255), self.array(), 5)
 
     def rotate(self, angle):
@@ -137,12 +153,96 @@ class Vector:
     @staticmethod
     def fromArray(array):
         return Vector(array[0], array[1])
+    
+    @staticmethod
+    def fromVector(vector):
+        return Vector(vector.x, vector.y)
+    
+class Line:
+    def __init__(self, p1, p2, diameter = 1):
+        self.p1 = p1
+        self.p2 = p2
+        self.diameter = diameter
+    
+    def getSlope(self):
+        if self.p1.x - self.p2.x == 0:
+            return float('inf')
+        else:
+            return (self.p1.y - self.p2.y) / (self.p1.x - self.p2.x)
+        
+    
+    def getAngle(self):
+        return math.atan2(self.p2.y - self.p1.y, self.p2.x - self.p1.x)
+        
+    def getYIntercept(self):
+        return self.p1.y - self.getSlope() * self.p1.x
+    
+    def getIntercection(self, line, b = "null"):
+        if b == "null":
+            if type(line) != Line:
+                raise Exception("Expected line object")
+            m = line.getSlope()
+            b = line.getYIntercept()
+            return self.getIntercection(m, b)
+        else:
+            m = line
+            thisSlope = self.getSlope()
+            if thisSlope == m:
+                return Vector(0, 0)
+            thisYIntercept = self.getYIntercept()
+            x = (b - thisYIntercept) / (thisSlope - m)
+            y = thisSlope * x + thisYIntercept
+            return Vector(x, y)
+    
+    def getPerpendicularIntersection(self, point):
+        thisSlope = self.getSlope()
+        if thisSlope == float('inf'):
+            perpendicularSlope = 0
+        elif thisSlope == 0:
+            perpendicularSlope = float('inf')
+        else:
+            perpendicularSlope = -1 / thisSlope
+        
+        perpendicularYIntercept = point.y - point.x * perpendicularSlope
 
+        return self.getIntercection(perpendicularSlope, perpendicularYIntercept)
+    
+    def interceptCircle(self, center, radius):
+        closestPoint = self.getPerpendicularIntersection(center)
+        if self.p1.x > self.p2.x:
+            farthestXPoint = self.p1
+            closestXPoint = self.p2
+        else:
+            farthestXPoint = self.p2
+            closestXPoint = self.p1
+
+        if closestPoint.x > farthestXPoint.x:
+            closestPoint = farthestXPoint
+        elif closestPoint.x < closestXPoint.x:
+            closestPoint = closestXPoint
+
+        return distance(center, closestPoint) < radius + self.diameter / 2
+    
+    def render(self, color):
+        vectorDiff = self.p1.difference(self.p2)
+        points = (self.p1.added(vectorDiff.rotate(math.pi / 2).normalized(self.diameter / 2)).array(),
+                  self.p1.added(vectorDiff.rotate(-math.pi / 2).normalized(self.diameter / 2)).array(),
+                  self.p2.added(vectorDiff.rotate(-math.pi / 2).normalized(self.diameter / 2)).array(),
+                  self.p2.added(vectorDiff.rotate(math.pi / 2).normalized(self.diameter / 2)).array()
+                  )
+        pygame.draw.polygon(screen, color, points)
+        pygame.draw.circle(screen, color, self.p1.array(), self.diameter / 2)
+        pygame.draw.circle(screen, color, self.p2.array(), self.diameter / 2)
+
+
+        #pygame.draw.line(screen, color, self.p1.array(), self.p2.array(), self.diameter)
+    
 class Projectile:
     projectiles = []
     currentIndex = 0
-    def __init__(self, x = 0, y = 0, vx = 0, vy = 0, ax = 0, ay = 0, projectileType = "noAI", owner = -1, targetType = -1):
+    def __init__(self, x = 0, y = 0, vx = 0, vy = 0, ax = 0, ay = 0, projectileType = "noAI", owner = -1, targetType = -1, angle = 0):
         self.pos = Vector(x, y)
+        self.startPos = Vector(x, y)
         self.vel = Vector(vx, vy)
         self.acc = Vector(0, 0)
         self.tick = 0
@@ -150,6 +250,7 @@ class Projectile:
         self.remove = False
         self.buffer = 5
         self.type = projectileType
+        self.angle = angle
         self.radius = projectileConstants[projectileType].radius
         self.bounceOnWall = projectileConstants[projectileType].bounceOnWall
         self.piercing = projectileConstants[projectileType].piercing
@@ -160,6 +261,10 @@ class Projectile:
         self.collisionCount = 0
         self.targetType = targetType
         self.damage = projectileConstants[projectileType].damage
+        self.shape = projectileConstants[projectileType].shape
+        self.diameter = projectileConstants[projectileType].diameter
+        self.follow = projectileConstants[projectileType].follow
+        self.line = Line(self.pos, Vector(self.pos.x + self.radius * math.cos(self.angle), self.pos.y + self.radius * math.sin(self.angle)), self.diameter) if self.shape == "beam" else Line(self.pos, self.pos, self.radius * 2)
         Entity.currentIndex += 1
 
     def conditionalRemove(self):
@@ -202,11 +307,16 @@ class Projectile:
     def summonByVector(x, y, angle, vel = 0, acc = 0, projectileType = "noAI", owner = -1, targetType = -1):
         if vel == 0:
             vel = projectileConstants[projectileType].startSpeed
-        Projectile.projectiles.append(Projectile(x, y, vel * math.cos(angle), vel * math.sin(angle), acc * math.cos(angle), vel * math.sin(angle), projectileType, owner, targetType))
+        Projectile.projectiles.append(Projectile(x, y, vel * math.cos(angle), vel * math.sin(angle), acc * math.cos(angle), vel * math.sin(angle), projectileType, owner, targetType, angle = angle))
 
     def render(self):
-        pygame.draw.circle(screen, (0, 255, 255), self.pos.array(), self.radius)
-        
+        if self.shape == "ring":
+            pygame.draw.circle(screen, (0, 255, 255), self.pos.array(), self.radius, self.diameter)
+        elif self.shape == "bullet":
+            pygame.draw.circle(screen, (0, 255, 255), self.pos.array(), self.radius)
+        elif self.shape == "beam":
+            self.line.render((0, 255, 255))
+
     def update(self):
         exec(f'''self.{self.type}()''')
         
@@ -223,6 +333,16 @@ class Projectile:
             self.vel.zero()
 
         self.pos.add(self.vel)
+
+        if self.follow and self.owner != -1:
+            self.pos = self.owner.pos
+
+        if self.shape == "beam":
+            if self.vel.magnitude() != 0:
+                self.angle = self.vel.angle()
+            self.line.p1 = Vector.fromVector(self.pos)
+            self.line.p2 = self.pos.added(Vector.fromAngle(self.angle, self.radius))
+            self.line.diameter = self.diameter
 
         if self.bounceOnWall:
             if self.pos.x > width or self.pos.x < 0:
@@ -250,7 +370,7 @@ class Projectile:
     def explosion(self):
         if self.tick < 2:
             self.radius += 12
-        elif self.tick < 8:
+        elif self.tick < 10:
             self.radius -= 3
         else:
             self.remove = True
@@ -290,7 +410,40 @@ class Projectile:
     def missile(self):
         #self.homing()
         if self.remove:
+            Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "shockwave")
             Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "explosion")
+
+    def shockwave(self):
+        if self.tick < 30:
+            self.radius += 5
+        elif self.tick < 35:
+            self.diameter -= 1
+            self.radius += 5
+        else:
+            self.remove = True
+        
+    def laser(self):
+        pass
+
+    def energyBeam(self):
+        self.angle += (self.owner.angle - self.angle) / 5
+        if self.tick < 50:
+            self.radius += (self.tick // 10) ** 4
+            self.diameter += 0.2
+        elif self.tick < 90:
+            if self.diameter < 20:
+                if self.diameter > 5:
+                    self.diameter += (random.random() - 0.5) * 8
+                else:
+                    self.diameter += 4
+            else:
+                self.diameter -= 4
+        elif self.tick == 90:
+            self.diameter = 10
+        elif self.tick < 100:
+            self.diameter -= 1
+        else:
+            self.remove = True
 
 class Entity:
     entities = []
@@ -316,6 +469,7 @@ class Entity:
         self.damageCooldown = 5
         self.health = 100
         self.maxHealth = 100
+        self.angle = 0
         Entity.currentIndex += 1
 
     def moveTowards(self, vector):
@@ -402,7 +556,13 @@ class Entity:
 
     def checkProjectileCollision(self):
         for projectile in Projectile.projectiles:
-            if projectile.owner != self and distance(projectile.pos, self.pos) <= projectile.radius + self.radius:
+            if projectile.shape == "ring":
+                collisionCondition = distance(projectile.pos, self.pos) <= projectile.radius + self.radius + projectile.diameter / 2 and distance(projectile.pos, self.pos) >= projectile.radius - self.radius - projectile.diameter / 2
+            elif projectile.shape == "bullet":
+                collisionCondition = distance(projectile.pos, self.pos) <= projectile.radius + self.radius
+            elif projectile.shape == "beam":
+                collisionCondition = projectile.line.interceptCircle(self.pos, self.radius)
+            if projectile.owner != self and collisionCondition:
                 projectile.collideWithEntity()
                 self.damageRequest(projectile.damage)
                 return True
@@ -422,6 +582,9 @@ class Entity:
         
     def update(self):
         exec(f'''self.{self.type}()''')
+
+        if self.target != -1 and not self.target.remove:
+            self.angle = math.atan2(self.target.pos.y - self.pos.y, self.target.pos.x - self.pos.x)
 
         if self.health <= 0:
             self.remove = True
@@ -519,11 +682,11 @@ class Entity:
             distanceVector = Vector(self.target.pos.x - self.pos.x, self.target.pos.y - self.pos.y)
             distanceToTarget = distanceVector.magnitude()
 
-            if distanceToTarget < 100:
+            if distanceToTarget < 500:
                 if self.shootTick <= 0:
-                    projectileType = "scatter" if random.randint(1, 100) < 80 else "scatter"
+                    projectileType = "energyBeam" if random.randint(1, 100) < 80 else "energyBeam"
                     Projectile.summonByVector(self.pos.x, self.pos.y, distanceVector.angle(), 0, 0, projectileType, self, "sniper")
-                    self.shootTick = 30
+                    self.shootTick = 120
 
             if distanceToTarget < 1000 and distanceToTarget > 50:
                 self.moveTowards(self.target.pos.shuffledVector(10))
@@ -544,9 +707,9 @@ class Entity:
 
             if distanceToTarget < 400:
                 if self.shootTick <= 0:
-                    projectileType = "scatter" if random.randint(1, 100) < 90 else "scatter"
+                    projectileType = "noAI" if random.randint(1, 100) < 90 else "noAI"
                     Projectile.summonByVector(self.pos.x, self.pos.y, distanceVector.angle(), 0, 0, projectileType, self, "shooter")
-                    self.shootTick = 15
+                    self.shootTick = 1000
 
             if distanceToTarget < 600 and distanceToTarget > 500:
                 self.moveTowards(self.target.pos.shuffledVector(10))
@@ -662,14 +825,14 @@ def draw():
     #    Entity.entities[-1].maxVel = 0.4
     #    Entity.entities[-1].maxAcc = 0.04
 
-    if q_key:
+    if q_tick == 1:
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "shooter"))
 
     if e_tick == 1 or r_tick == 1 or t_tick == 1 or y_tick == 1:
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "sniper"))
 
     if mousetick:
-        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "scatter")
+        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "laser")
 
     player.controller()
     player.update()
