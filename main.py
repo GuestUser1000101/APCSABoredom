@@ -15,6 +15,8 @@ screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 running = True
 mousetick = 0
 mousehold = 0
+mouseX = 0
+mouseY = 0
 
 velocityTime = [(0, 0)] * 400
 
@@ -296,9 +298,11 @@ class Projectile:
     def conditionalRemove(self):
         self.remove = True
 
-    def collideWithEntity(self):
+    def collideWithEntity(self, target):
         if not self.piercing:
             self.remove = True
+        if self.type == "energyBeam":
+            Projectile.summonByVector(target.pos.x, target.pos.y, 0, 0, 0, "largeExplosion", self.owner)
         self.collisionCount += 1
     
     def findClosest(self, entityType = -1):
@@ -434,10 +438,10 @@ class Projectile:
                 self.remove = True
 
     def missile(self):
-        #self.homing()
+        self.homing()
         if self.remove:
-            Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "shockwave")
-            Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "explosion")
+            #Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "shockwave")
+            Projectile.summonByVector(self.pos.x, self.pos.y, 0, 0, projectileType = "largeExplosion")
 
     def shockwave(self):
         if self.tick < 30:
@@ -469,6 +473,23 @@ class Projectile:
             self.diameter = 10
         elif self.tick < 100:
             self.diameter -= 1
+        else:
+            self.remove = True
+
+    def largeExplosion(self):
+        if self.tick < 10:
+            self.radius += 8
+        elif self.tick < 40:
+            self.radius += (random.random() - 0.5) * 6
+            self.radius += 1
+        elif self.tick < 120:
+            self.radius += (random.random() - 0.5) * 6
+            self.radius -= 1
+        elif self.tick < 160:
+            if self.radius > 0:
+                self.radius -= 2
+            else:
+                self.remove = True
         else:
             self.remove = True
 
@@ -590,7 +611,7 @@ class Entity:
             elif projectile.shape == "beam":
                 collisionCondition = projectile.line.interceptCircle(self.pos, self.radius)
             if projectile.owner != self and collisionCondition:
-                projectile.collideWithEntity()
+                projectile.collideWithEntity(self)
                 self.damageRequest(projectile.damage)
                 return True
         return False
@@ -709,7 +730,7 @@ class Entity:
             distanceVector = Vector(self.target.pos.x - self.pos.x, self.target.pos.y - self.pos.y)
             distanceToTarget = distanceVector.magnitude()
 
-            if distanceToTarget < 500:
+            if distanceToTarget < 100:
                 if self.shootTick <= 0:
                     projectileType = "noAI" if random.randint(1, 100) < 80 else "missile"
                     Projectile.summonByVector(self.pos.x, self.pos.y, distanceVector.angle(), 0, 0, projectileType, self, "sniper")
@@ -759,6 +780,7 @@ class Controller:
         self.maxAcc = 0.2
         self.maxVel = 5
         self.tick = 0
+        self.angle = 0
 
     def findClosestWall(self):
         wallX = width if self.pos.x > width / 2 else 0
@@ -794,6 +816,8 @@ class Controller:
             self.vel.zero()
 
         self.pos.add(self.vel)
+
+        self.angle = math.atan2(mouseY - self.pos.y, mouseX - self.pos.x)
 
         if self.pos.x > width or self.pos.x < 0:
             self.pos.x -= self.vel.x
@@ -859,7 +883,7 @@ def draw():
         Entity.entities.append(Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "sniper"))
 
     if mousetick:
-        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, projectileType = "laser")
+        Projectile.summonByVector(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], random.randint(0, 360), 0, 0, "energyBeam", player)
 
     player.controller()
     player.update()
@@ -929,5 +953,7 @@ while running:
         exec(f"{letter}_tick = -1 if {letter}_tick == 1 else {letter}_tick")
     
     mousetick = 0
+    mouseX = pygame.mouse.get_pos()[0]
+    mouseY = pygame.mouse.get_pos()[1]
     pygame.display.update()
     clock.tick(FPS)
