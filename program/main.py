@@ -21,6 +21,27 @@ mouseY = 0
 
 velocityTime = [(0, 0)] * 400
 
+weaponSelection = 0
+weapons = [
+    "bullet",
+    "slug",
+    "piercer",
+    "homingBullet",
+    "missile",
+    "laserPulse",
+    "splitter",
+    "shell",
+    "homingMissile",
+    "laserBeam",
+    "laserSplitter",
+    "multiSplitter",
+    "homingSplitter",
+    "rocket",
+    "homingShell",
+    "laserCannon",
+    "laserField",
+]
+
 alphabet = [
     "a",
     "b",
@@ -376,6 +397,15 @@ class Projectile:
         self.shape = projectileConstants[projectileType].shape
         self.diameter = projectileConstants[projectileType].diameter
         self.follow = projectileConstants[projectileType].follow
+        self.homing = projectileConstants[projectileType].homing
+        self.explosionType = projectileConstants[projectileType].explosionType
+        self.invincibilityFrames = projectileConstants[
+            projectileType
+        ].invincibilityFrames
+        self.initialTickSave = 0
+        self.alreadySplit = False
+        self.explodeAtEntity = projectileConstants[projectileType].explodeAtEntity
+        self.shootCooldown = 0
         self.line = (
             Line(
                 self.pos,
@@ -388,7 +418,7 @@ class Projectile:
             if self.shape == "beam"
             else Line(self.pos, self.pos, self.radius * 2)
         )
-        Entity.currentIndex += 1
+        Projectile.currentIndex += 1
 
     def conditionalRemove(self):
         self.remove = True
@@ -396,10 +426,11 @@ class Projectile:
     def collideWithEntity(self, target):
         if not self.piercing:
             self.remove = True
-        if self.type == "energyBeam":
-            Projectile.summonByVector(
-                target.pos.x, target.pos.y, 0, 0, 0, "largeExplosion", self.owner
-            )
+        if self.explosionType != "none":
+            if self.explodeAtEntity:
+                self.explode(self.explosionType, target.pos)
+            else:
+                self.explode(self.explosionType)
         self.collisionCount += 1
 
     def findClosest(self, entityType=-1):
@@ -461,10 +492,35 @@ class Projectile:
         elif self.shape == "beam":
             self.line.render((0, 255, 255))
 
+    def home(self, target):
+        if target != -1:
+            distanceToClosest = distance(self.pos, target.pos)
+            distanceVector = Vector(
+                target.pos.x - self.pos.x, target.pos.y - self.pos.y
+            )
+            distanceVector.normalize(self.maxAcc)
+            distanceX = abs(self.pos.x - target.pos.x)
+            distanceY = abs(self.pos.y - target.pos.y)
+            if distanceToClosest < 400:
+                self.acc = distanceVector
+                if abs(distanceX) < abs(
+                    displacement(self.maxAcc, self.vel.x, target.vel.x)
+                ):
+                    self.stopX()
+                if abs(distanceY) < abs(
+                    displacement(self.maxAcc, self.vel.y, target.vel.y)
+                ):
+                    self.stopY()
+
     def update(self):
         exec(f"""self.{self.type}()""")
 
+        if self.homing:
+            self.home(self.findClosest())
+
         self.tick += 1
+        if self.shootCooldown > 0:
+            self.shootCooldown -= 1
 
         if self.acc.magnitude() > self.maxAcc:
             self.acc.normalize(self.maxAcc)
@@ -506,12 +562,37 @@ class Projectile:
             ):
                 self.remove = True
 
-    def explode(self, explosionType="explosion"):
-        Projectile.summonByVector(
-            self.pos.x, self.pos.y, 0, 0, projectileType=explosionType
-        )
+    def alignedToClosest(self, maxDistance, minAngleDiff, minDistance):
+        closestEntity = self.findClosest(self.targetType)
+        if closestEntity != -1 and closestEntity != self.owner:
+            distanceVector = Vector(
+                closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y
+            )
+            if (
+                distanceVector.magnitude() < maxDistance
+                and abs(self.vel.angle() - distanceVector.angle()) < minAngleDiff
+            ) or distanceVector.magnitude() < minDistance:
+                return True
+        return False
 
-    def explosion(self):
+    def split(self, amount, projectileType, angleDiff):
+        for i in range(amount):
+            Projectile.summonByVector(
+                self.pos.x,
+                self.pos.y,
+                self.vel.angle() + angleDiff * (i - amount / 2 + 0.5),
+                0,
+                projectileType=projectileType,
+            )
+
+    def explode(self, explosionType="explosion", pos=-1):
+        if pos == -1:
+            pos = self.pos
+
+        Projectile.summonByVector(pos.x, pos.y, 0, 0, projectileType=explosionType)
+        Projectile.projectiles[-1].damage = self.damage
+
+    def smallExplosion(self):
         if self.tick < 2:
             self.radius += 12
         elif self.tick < 10:
@@ -519,42 +600,30 @@ class Projectile:
         else:
             self.remove = True
 
+    def mediumExplosion(self):
+        if self.tick < 2:
+            self.radius += 20
+        elif self.tick < 20:
+            self.radius -= 2
+        else:
+            self.remove = True
+
     def largeExplosion(self):
-        if self.tick < 10:
-            self.radius += 8
+        if self.tick < 8:
+            self.radius += 5
         elif self.tick < 40:
             self.radius += (random.random() - 0.5) * 6
-            self.radius += 1
-        elif self.tick < 120:
+            self.radius += 0.5
+        elif self.tick < 100:
             self.radius += (random.random() - 0.5) * 6
             self.radius -= 1
-        elif self.tick < 160:
+        elif self.tick < 120:
             if self.radius > 0:
                 self.radius -= 2
             else:
                 self.remove = True
         else:
             self.remove = True
-
-    def homing(self, target):
-        if target != -1:
-            distanceToClosest = distance(self.pos, target.pos)
-            distanceVector = Vector(
-                target.pos.x - self.pos.x, target.pos.y - self.pos.y
-            )
-            distanceVector.normalize(self.maxAcc)
-            distanceX = abs(self.pos.x - target.pos.x)
-            distanceY = abs(self.pos.y - target.pos.y)
-            if distanceToClosest < 400:
-                self.acc = distanceVector
-                if abs(distanceX) < abs(
-                    displacement(self.maxAcc, self.vel.x, target.vel.x)
-                ):
-                    self.stopX()
-                if abs(distanceY) < abs(
-                    displacement(self.maxAcc, self.vel.y, target.vel.y)
-                ):
-                    self.stopY()
 
     def noAI(self):
         pass
@@ -569,50 +638,87 @@ class Projectile:
         pass
 
     def missile(self):
-        if self.remove:
-            self.explode("explosion")
+        pass
 
-    def bouncy(self):
-        if self.bounceCount > 3:
+    def homingBullet(self):
+        pass
+
+    def splitter(self):
+        if self.alignedToClosest(200, math.pi / 18, 50):
+            self.split(3, "bullet", math.pi / 36)
             self.remove = True
 
-    def large(self):
-        self.radius += 0.1
+    def shell(self):
+        pass
 
-    def scatter(self):
-        closestEntity = self.findClosest(self.targetType)
-        if closestEntity != -1 and closestEntity != self.owner:
-            distanceVector = Vector(
-                closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y
-            )
-            self.homing(closestEntity)
-            if (
-                distanceVector.magnitude() < 200
-                and abs(self.vel.angle() - distanceVector.angle()) < math.pi / 36
-            ):
-                for i in range(3):
-                    Projectile.summonByVector(
-                        self.pos.x,
-                        self.pos.y,
-                        self.vel.angle() + math.pi * (i - 4) / 36,
-                        0,
-                        projectileType="missile",
-                    )
-                self.remove = True
+    def homingMissile(self):
+        pass
 
-    def shockwave(self):
-        if self.tick < 30:
-            self.radius += 5
-        elif self.tick < 35:
-            self.diameter -= 1
-            self.radius += 5
+    def laserBeam(self):
+        self.angle = approachAngle(self.angle, self.owner.angle, 0.3)
+
+        if self.tick < 20:
+            self.radius += (self.tick // 2) ** 4
+            self.diameter += 0.2
+        elif self.tick < 80:
+            if self.diameter < 6:
+                if self.diameter > 2:
+                    self.diameter += (random.random() - 0.5) * 2
+                else:
+                    self.diameter += 2
+            else:
+                self.diameter -= 2
+        elif self.tick == 80:
+            self.diameter = 4
+        elif self.tick < 88:
+            self.diameter -= 0.5
         else:
             self.remove = True
 
-    def laserPulse(self):
+    def laserSplitter(self):
+        if not self.alreadySplit and self.alignedToClosest(100, math.pi / 36, 20):
+            self.split(2, "laserPulse", math.pi / 18)
+            self.alreadySplit = True
+
+    def multiSplitter(self):
+        if self.alignedToClosest(200, math.pi / 18, 50):
+            self.split(5, "slug", math.pi / 36)
+            self.remove = True
+
+    def homingSplitter(self):
+        if not self.alreadySplit and self.alignedToClosest(0, math.pi / 18, 500):
+            self.initialTickSave = self.tick
+            self.alreadySplit = True
+        if self.alreadySplit:
+            if (
+                self.tick == self.initialTickSave
+                or self.tick == self.initialTickSave + 20
+                or self.tick == self.initialTickSave + 40
+                or self.tick == self.initialTickSave + 60
+                or self.tick == self.initialTickSave + 80
+                or self.tick == self.initialTickSave + 100
+                or self.tick == self.initialTickSave + 120
+                or self.tick == self.initialTickSave + 140
+                or self.tick == self.initialTickSave + 160
+            ):
+                Projectile.summonByVector(
+                    self.pos.x,
+                    self.pos.y,
+                    0,
+                    projectileType="homingBullet",
+                    owner=self.owner,
+                )
+                self.radius -= 0.2
+            elif self.tick > self.initialTickSave + 160:
+                self.remove = True
+
+    def rocket(self):
         pass
 
-    def energyBeam(self):
+    def homingShell(self):
+        pass
+
+    def laserCannon(self):
         self.angle = approachAngle(self.angle, self.owner.angle, 0.3)
 
         if self.tick < 50:
@@ -632,6 +738,57 @@ class Projectile:
             self.diameter -= 1
         else:
             self.remove = True
+
+    def laserField(self):
+        closestEntity = self.findClosest()
+        if closestEntity != -1 and self.shootCooldown <= 0:
+            vectorToClosest = Vector(closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y)
+            Projectile.summonByVector(
+                self.pos.x,
+                self.pos.y,
+                vectorToClosest.angle(),
+                projectileType="laserPulse",
+                owner=self.owner,
+            )
+            self.shootCooldown = 20
+        
+        self.radius = 2 * math.sin(self.tick / 10) + 5
+
+    def bouncy(self):
+        if self.bounceCount > 3:
+            self.remove = True
+
+    def scatter(self):
+        closestEntity = self.findClosest(self.targetType)
+        if closestEntity != -1 and closestEntity != self.owner:
+            distanceVector = Vector(
+                closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y
+            )
+            if (
+                distanceVector.magnitude() < 200
+                and abs(self.vel.angle() - distanceVector.angle()) < math.pi / 12
+            ) or distanceVector.magnitude() < 50:
+                for i in range(3):
+                    Projectile.summonByVector(
+                        self.pos.x,
+                        self.pos.y,
+                        self.vel.angle() + math.pi * (i - 1) / 36,
+                        0,
+                        projectileType="missile",
+                    )
+                self.remove = True
+
+    def shockwave(self):
+        if self.tick < 30:
+            self.radius += 5
+        elif self.tick < 35:
+            self.diameter -= 1
+            self.radius += 5
+        else:
+            self.remove = True
+
+    def laserPulse(self):
+        pass
 
 
 class Entity:
@@ -791,14 +948,14 @@ class Entity:
                 )
             if projectile.owner != self and collisionCondition:
                 projectile.collideWithEntity(self)
-                self.damageRequest(projectile.damage)
+                self.damageRequest(projectile.damage, projectile.invincibilityFrames)
                 return True
         return False
 
-    def damageRequest(self, damage):
+    def damageRequest(self, damage, invincibilityFrames=30):
         if self.damageTick <= 0:
             self.health -= damage
-            self.damageTick = self.damageCooldown
+            self.damageTick = invincibilityFrames
 
     def render(self):
         pygame.draw.circle(screen, self.color, self.pos.array(), self.radius)
@@ -960,7 +1117,7 @@ class Entity:
             if distanceToTarget < 400:
                 if self.shootTick <= 0:
                     projectileType = (
-                        "energyBeam" if random.randint(1, 100) < 90 else "energyBeam"
+                        "laserCannon" if random.randint(1, 100) < 90 else "laserCannon"
                     )
                     Projectile.summonByVector(
                         self.pos.x,
@@ -997,6 +1154,7 @@ class Controller:
         self.maxVel = 5
         self.tick = 0
         self.angle = 0
+        self.weaponIndex = 0
 
     def findClosestWall(self):
         wallX = width if self.pos.x > width / 2 else 0
@@ -1082,7 +1240,7 @@ player = Controller()
 
 
 def draw():
-    global prey
+    global weaponSelection
 
     screen.fill((0, 0, 0))
 
@@ -1107,14 +1265,41 @@ def draw():
             Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "sniper")
         )
 
+    if l_tick == 1:
+        weaponSelection += 1
+        if weaponSelection >= len(weapons):
+            weaponSelection = 0
+        print(weapons[weaponSelection])
+
+    if k_tick == 1:
+        weaponSelection -= 1
+        if weaponSelection < 0:
+            weaponSelection = len(weapons) - 1
+        print(weapons[weaponSelection])
+
+    closestPos = -1
+    closestDistance = 50
+    for entity in Entity.entities:
+        distanceToEntity = distance(entity.pos, Vector(mouseX, mouseY))
+        if distanceToEntity < closestDistance:
+            closestDistance = distanceToEntity
+            closestPos = entity.pos
+
+    if closestPos != -1:
+        shootAngle = math.atan2(
+            closestPos.y - player.pos.y, closestPos.x - player.pos.x
+        )
+    else:
+        shootAngle = math.atan2(mouseY - player.pos.y, mouseX - player.pos.x)
+
     if mousetick:
         Projectile.summonByVector(
-            pygame.mouse.get_pos()[0],
-            pygame.mouse.get_pos()[1],
-            random.randint(0, 360),
+            player.pos.x,
+            player.pos.y,
+            shootAngle,
             0,
             0,
-            "scatter",
+            weapons[weaponSelection],
             player,
         )
 
