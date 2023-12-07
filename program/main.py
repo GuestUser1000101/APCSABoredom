@@ -310,7 +310,6 @@ class Line:
         self.p2 = p2
         self.diameter = diameter
 
-
     def getSlope(self):
         if self.p1.x - self.p2.x == 0:
             return float("inf")
@@ -327,7 +326,7 @@ class Line:
         return self.getSlope() * x + self.getYIntercept()
     
     def getX(self, y):
-        return (y - self.getYIntercept) / self.getSlope()
+        return (y - self.getYIntercept()) / self.getSlope()
 
     def getIntercection(self, line, b="null"):
         if b == "null":
@@ -374,6 +373,46 @@ class Line:
             closestPoint = closestXPoint
 
         return distance(center, closestPoint) < radius + self.diameter / 2
+    
+    def getBoundedLinesX(self):
+        lines = self.getBoundedLinesY()
+        if self.p1.x < 0:
+            lines += Line(Vector(0, self.getY(0)), Vector(-self.p1.x, self.p1.y)).getBoundedLinesY()
+        elif self.p1.x > width:
+            lines += Line(Vector(width, self.getY(width)), Vector(2 * width - self.p1.x, self.p1.y)).getBoundedLinesY()
+
+        if self.p2.x < 0:
+            lines += Line(Vector(0, self.getY(0)), Vector(-self.p2.x, self.p2.y)).getBoundedLinesY()
+        elif self.p2.x > width:
+            lines += Line(Vector(width, self.getY(width)), Vector(2 * width - self.p2.x, self.p2.y)).getBoundedLinesY()
+
+        return lines
+
+    def getBoundedLinesY(self):
+        lines = [self]
+        if self.p1.y < 0:
+            lines += Line(Vector(self.getX(0), 0), Vector(self.p1.x, -self.p1.y)).getBoundedLinesX()
+        elif self.p1.y > height:
+            lines += Line(Vector(self.getX(height), height), Vector(self.p1.x, 2 * height - self.p1.y)).getBoundedLinesX()
+
+        if self.p2.y < 0:
+            lines += Line(Vector(self.getX(0), 0), Vector(self.p2.x, -self.p2.y)).getBoundedLinesX()
+        elif self.p2.y > height:
+            lines += Line(Vector(self.getX(height), height), Vector(self.p2.x, 2 * height - self.p2.y)).getBoundedLinesX()
+        
+        return lines
+    
+    def renderBoundedLines(self):
+        for line in self.getBoundedLinesX():
+            line.render((255, 0, 255))
+
+    def lengthen(self, direction, multiplier):
+        if direction == 1:
+            self.p1.x += (self.p1.x - self.p2.x) * (multiplier - 1)
+            self.p1.y += (self.p1.y - self.p2.y) * (multiplier - 1)
+        elif direction == 2:
+            self.p2.x += (self.p2.x - self.p1.x) * (multiplier - 1)
+            self.p2.y += (self.p2.y - self.p1.y) * (multiplier - 1)
 
     def render(self, color):
         vectorDiff = self.p1.difference(self.p2)
@@ -595,15 +634,17 @@ class Projectile:
 
         if self.bounceOnWall:
             if self.pos.x >= width or self.pos.x <= 0:
-                if self.seeking:
-                    self.pointAtEntity(self.findClosest())
+                closest = self.findClosest()
+                if self.seeking and closest != -1:
+                    self.pointAtEntity(closest)
                 else:
                     self.pos.x -= self.vel.x
                     self.vel.x = -self.vel.x
                 self.bounceCount += 1
             if self.pos.y >= height or self.pos.y <= 0:
-                if self.seeking:
-                    self.pointAtEntity(self.findClosest())
+                closest = self.findClosest()
+                if self.seeking and closest != -1:
+                        self.pointAtEntity(self.findClosest())
                 else:
                     self.pos.y -= self.vel.y
                     self.vel.y = -self.vel.y
@@ -689,7 +730,7 @@ class Projectile:
         pass
 
     def bouncer(self):
-        if self.bounceCount >= 3:
+        if self.bounceCount > 3:
             self.remove = True
 
     def slug(self):
@@ -699,7 +740,7 @@ class Projectile:
         pass
 
     def rebounder(self):
-        if self.bounceCount >= 5:
+        if self.bounceCount > 5:
             self.remove = True
 
     def bomb(self):
@@ -717,7 +758,8 @@ class Projectile:
         pass
 
     def seeker(self):
-        pass
+        if self.bounceCount > 10:
+            self.remove = True
 
     def bounceSplitter(self):
         if self.bounceCount >= 1:
@@ -1232,6 +1274,7 @@ class Controller:
         self.tick = 0
         self.angle = 0
         self.weaponIndex = 0
+        self.mouseLine = Line(Vector(mouseX, mouseY), self.pos)
 
     def __str__(self):
         return "The Player"
@@ -1256,6 +1299,12 @@ class Controller:
 
     def update(self):
         self.tick += 1
+        self.mouseLine.p1.x = mouseX
+        self.mouseLine.p1.y = mouseY
+        self.mouseLine.p2 = self.pos
+
+        self.mouseLine.lengthen(1, 3)
+
         if self.tick % (FPS / FPS) == 0:
             velocityTime[self.tick % len(velocityTime)] = (
                 self.vel.magnitude(),
@@ -1417,6 +1466,7 @@ def draw():
     Entity.currentIndex -= entitiesRemoved
     Entity.entities = cloneList(entitiesCopy)
 
+    player.mouseLine.renderBoundedLines()
 
 while running:
     for event in pygame.event.get():
