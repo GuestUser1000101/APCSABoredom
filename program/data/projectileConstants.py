@@ -13,6 +13,7 @@ class ProjectileTemplate:
         homing=False,
         invincibilityFrames=15,
         explodeAtEntity=False,
+        seeking=False,
     ):
         self.radius = radius
         self.bounceOnWall = bounceOnWall
@@ -26,13 +27,16 @@ class ProjectileTemplate:
         self.homing = homing
         self.invincibilityFrames = invincibilityFrames
         self.explodeAtEntity = explodeAtEntity
-
+        self.seeking = seeking
 
 projectileConstants = {
     "noAI": ProjectileTemplate(),
     "bullet": ProjectileTemplate(),
+    "bouncer" : ProjectileTemplate(damage=15, bounceOnWall=True),
     "slug": ProjectileTemplate(damage=20, radius=2),
     "piercer": ProjectileTemplate(damage=15, startSpeed=6, piercing=True),
+    "rebounder" : ProjectileTemplate(damage=20, bounceOnWall=True),
+    "bomb" : ProjectileTemplate(damage=25, bounceOnWall=True, piercing=True, startSpeed=3),
     "homingBullet": ProjectileTemplate(damage=20, homing=True),
     "missile": ProjectileTemplate(
         damage=25, startSpeed=3, explosionType="smallExplosion", radius=2
@@ -40,6 +44,8 @@ projectileConstants = {
     "laserPulse": ProjectileTemplate(
         piercing=True, shape="beam", radius=8, startSpeed=10, diameter=2, damage=25, invincibilityFrames=5
     ),
+    "seeker" : ProjectileTemplate(damage=20, startSpeed=6, seeking=True, bounceOnWall=True),
+    "bounceSplitter" : ProjectileTemplate(damage=0, bounceOnWall=True),
     "splitter": ProjectileTemplate(damage=0, radius=2),
     "shell": ProjectileTemplate(damage=35, explosionType="mediumExplosion", radius=3),
     "homingMissile": ProjectileTemplate(

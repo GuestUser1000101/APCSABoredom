@@ -24,11 +24,16 @@ velocityTime = [(0, 0)] * 400
 weaponSelection = 0
 weapons = [
     "bullet",
+    "bouncer",
     "slug",
     "piercer",
+    "rebounder",
+    "bomb",
     "homingBullet",
     "missile",
     "laserPulse",
+    "seeker",
+    "bounceSplitter",
     "splitter",
     "shell",
     "homingMissile",
@@ -268,13 +273,43 @@ class Vector:
     @staticmethod
     def fromVector(vector):
         return Vector(vector.x, vector.y)
+    
+    def isOutOfBounds(self):
+        return self.x < 0 or self.x > width or self.y < 0 or self.y > width
 
+    def boundPoint(self):
+        if self.x < 0:
+            self.x = -self.x
+        elif self.x > width:
+            self.x = 2 * width - self.x
+        if self.y < 0:
+            self.y = -self.y
+        elif self.y > height:
+            self.y = 2 * height - self.y
+
+    def getBoundedPoint(self):
+        if self.x < 0:
+            x = -self.x
+        elif self.x > width:
+            x = 2 * width - self.x
+        else:
+            x = self.x
+
+        if self.y < 0:
+            y = -self.y
+        elif self.y > height:
+            y = 2 * height - self.y
+        else:
+            y = self.y
+
+        return Vector(x, y)
 
 class Line:
     def __init__(self, p1, p2, diameter=1):
         self.p1 = p1
         self.p2 = p2
         self.diameter = diameter
+
 
     def getSlope(self):
         if self.p1.x - self.p2.x == 0:
@@ -287,6 +322,12 @@ class Line:
 
     def getYIntercept(self):
         return self.p1.y - self.getSlope() * self.p1.x
+    
+    def getY(self, x):
+        return self.getSlope() * x + self.getYIntercept()
+    
+    def getX(self, y):
+        return (y - self.getYIntercept) / self.getSlope()
 
     def getIntercection(self, line, b="null"):
         if b == "null":
@@ -356,7 +397,6 @@ class Line:
 
         # pygame.draw.line(screen, color, self.p1.array(), self.p2.array(), self.diameter)
 
-
 class Projectile:
     projectiles = []
     currentIndex = 0
@@ -405,6 +445,7 @@ class Projectile:
         self.initialTickSave = 0
         self.alreadySplit = False
         self.explodeAtEntity = projectileConstants[projectileType].explodeAtEntity
+        self.seeking = projectileConstants[projectileType].seeking
         self.shootCooldown = 0
         self.line = (
             Line(
@@ -420,6 +461,9 @@ class Projectile:
         )
         Projectile.currentIndex += 1
 
+    def __str__(self):
+        return "Projectile #" + self.index + " of type " + self.type
+
     def conditionalRemove(self):
         self.remove = True
 
@@ -433,15 +477,22 @@ class Projectile:
                 self.explode(self.explosionType)
         self.collisionCount += 1
 
-    def findClosest(self, entityType=-1):
+    def findClosest(self, radius=-1, entityType=-1, exceptions=[]):
         closestDistance = sys.maxsize
         closestEntity = -1
         for entity in Entity.entities:
-            condition = entityType == entity.type if entityType != -1 else True
-            if condition and distance(self.pos, entity.pos) < closestDistance:
+            typeCondition = entityType == entity.type if entityType != -1 else True
+            radiusCondition = distance(self.pos, entity.pos) <= radius if radius != -1 else True
+            exceptionCondition = not entity in exceptions if len(exceptions) > 0 else True
+
+            if typeCondition and radiusCondition and exceptionCondition and distance(self.pos, entity.pos) < closestDistance:
                 closestDistance = distance(self.pos, entity.pos)
                 closestEntity = entity
         return closestEntity
+    
+    def pointAtEntity(self, entity):
+        entityVector = Vector(entity.pos.x - self.pos.x, entity.pos.y - self.pos.y)
+        self.vel = self.vel.rotate(entityVector.angle() - self.vel.angle())
 
     def stop(self):
         self.acc.y = -sign(self.vel.y) * self.maxAcc
@@ -513,10 +564,8 @@ class Projectile:
                     self.stopY()
 
     def update(self):
-        exec(f"""self.{self.type}()""")
-
         if self.homing:
-            self.home(self.findClosest())
+            self.home(self.findClosest(exceptions=[self.owner]))
 
         self.tick += 1
         if self.shootCooldown > 0:
@@ -545,13 +594,19 @@ class Projectile:
             self.line.diameter = self.diameter
 
         if self.bounceOnWall:
-            if self.pos.x > width or self.pos.x < 0:
-                self.pos.x -= self.vel.x
-                self.vel.x = -self.vel.x
+            if self.pos.x >= width or self.pos.x <= 0:
+                if self.seeking:
+                    self.pointAtEntity(self.findClosest())
+                else:
+                    self.pos.x -= self.vel.x
+                    self.vel.x = -self.vel.x
                 self.bounceCount += 1
-            if self.pos.y > height or self.pos.y < 0:
-                self.pos.y -= self.vel.y
-                self.vel.y = -self.vel.y
+            if self.pos.y >= height or self.pos.y <= 0:
+                if self.seeking:
+                    self.pointAtEntity(self.findClosest())
+                else:
+                    self.pos.y -= self.vel.y
+                    self.vel.y = -self.vel.y
                 self.bounceCount += 1
         else:
             if (
@@ -561,6 +616,8 @@ class Projectile:
                 or self.pos.y < 0
             ):
                 self.remove = True
+
+        exec(f"""self.{self.type}()""")
 
     def alignedToClosest(self, maxDistance, minAngleDiff, minDistance):
         closestEntity = self.findClosest(self.targetType)
@@ -631,17 +688,41 @@ class Projectile:
     def bullet(self):
         pass
 
+    def bouncer(self):
+        if self.bounceCount >= 3:
+            self.remove = True
+
     def slug(self):
         pass
 
     def piercer(self):
         pass
 
+    def rebounder(self):
+        if self.bounceCount >= 5:
+            self.remove = True
+
+    def bomb(self):
+        if self.tick >= 90:
+            self.explode("smallExplosion")
+            self.remove = True
+
     def missile(self):
         pass
 
     def homingBullet(self):
         pass
+
+    def laserPulse(self):
+        pass
+
+    def seeker(self):
+        pass
+
+    def bounceSplitter(self):
+        if self.bounceCount >= 1:
+            self.split(3, "rebounder", math.pi / 36)
+            self.remove = True
 
     def splitter(self):
         if self.alignedToClosest(200, math.pi / 18, 50):
@@ -787,9 +868,6 @@ class Projectile:
         else:
             self.remove = True
 
-    def laserPulse(self):
-        pass
-
 
 class Entity:
     entities = []
@@ -822,6 +900,9 @@ class Entity:
         self.maxHealth = 100
         self.angle = 0
         Entity.currentIndex += 1
+
+    def __str__(self):
+        return "Entity #" + str(self.index) + " of type " + self.type
 
     def moveTowards(self, vector):
         self.acc.x = vector.x - self.pos.x
@@ -1078,11 +1159,9 @@ class Entity:
             )
             distanceToTarget = distanceVector.magnitude()
 
-            if distanceToTarget < 100:
+            if distanceToTarget < 200:
                 if self.shootTick <= 0:
-                    projectileType = (
-                        "noAI" if random.randint(1, 100) < 80 else "missile"
-                    )
+                    projectileType = weapons[weaponSelection]
                     Projectile.summonByVector(
                         self.pos.x,
                         self.pos.y,
@@ -1095,7 +1174,7 @@ class Entity:
                     )
                     self.shootTick = 30
 
-            if distanceToTarget < 1000 and distanceToTarget > 50:
+            if distanceToTarget < 1000 and distanceToTarget > 150:
                 self.moveTowards(self.target.pos.shuffledVector(10))
             else:
                 self.stop()
@@ -1114,11 +1193,9 @@ class Entity:
             )
             distanceToTarget = distanceVector.magnitude()
 
-            if distanceToTarget < 400:
+            if distanceToTarget < 200:
                 if self.shootTick <= 0:
-                    projectileType = (
-                        "laserCannon" if random.randint(1, 100) < 90 else "laserCannon"
-                    )
+                    projectileType = weapons[weaponSelection]
                     Projectile.summonByVector(
                         self.pos.x,
                         self.pos.y,
@@ -1129,9 +1206,9 @@ class Entity:
                         self,
                         "shooter",
                     )
-                    self.shootTick = 150
+                    self.shootTick = 30
 
-            if distanceToTarget < 600 and distanceToTarget > 500:
+            if distanceToTarget < 1000 and distanceToTarget > 150:
                 self.moveTowards(self.target.pos.shuffledVector(10))
             else:
                 self.stop()
@@ -1155,6 +1232,9 @@ class Controller:
         self.tick = 0
         self.angle = 0
         self.weaponIndex = 0
+
+    def __str__(self):
+        return "The Player"
 
     def findClosestWall(self):
         wallX = width if self.pos.x > width / 2 else 0
@@ -1255,12 +1335,12 @@ def draw():
     #    Entity.entities[-1].maxVel = 0.4
     #    Entity.entities[-1].maxAcc = 0.04
 
-    if q_key:
+    if q_tick == 1:
         Entity.entities.append(
             Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "shooter")
         )
 
-    if e_tick == 1 or r_tick == 1 or t_tick == 1 or y_tick == 1:
+    if e_tick == 1:
         Entity.entities.append(
             Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "sniper")
         )
