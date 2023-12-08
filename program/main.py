@@ -41,6 +41,8 @@ weapons = [
     "laserBeam",
     "laserSplitter",
     "pursuer",
+    "grenadeSplitter",
+    "plasmaGrenade",
     "multiSplitter",
     "homingSplitter",
     "rocket",
@@ -385,7 +387,7 @@ class Line:
 
         if self.p2.x < 0:
             lines += Line(Vector(0, self.getY(0)), Vector(-self.p2.x, self.p2.y)).getBoundedLinesY()
-        elif self.p2.x > width:
+        elif self.p2.x > width: 
             lines += Line(Vector(width, self.getY(width)), Vector(2 * width - self.p2.x, self.p2.y)).getBoundedLinesY()
 
         return lines
@@ -757,6 +759,8 @@ class Projectile:
         pass
 
     def rebounder(self):
+        self.damage = 20 + self.bounceCount * 10
+        self.radius = 1 + self.bounceCount * 0.5
         if self.bounceCount > 5:
             self.remove = True
 
@@ -829,6 +833,26 @@ class Projectile:
 
     def pursuer(self):
         if self.bounceCount + self.collisionCount > 10:
+            self.remove = True
+
+    def grenadeSplitter(self):
+        if self.bounceCount >= 1:
+            self.split(3, "grenade", math.pi / 36)
+            self.remove = True
+
+    def plasmaGrenade(self):
+        if self.tick < 150:
+            self.radius -= 1/100
+        elif self.tick < 300:
+            if self.tick % 60 > 30:
+                self.radius += 1/5
+            else:
+                self.radius -= 1/5
+            if self.alignedToClosest(0, math.pi / 36, 25):
+                self.explode("largeExplosion")
+                self.remove = True
+        else:
+            self.explode("largeExplosion")
             self.remove = True
 
     def multiSplitter(self):
@@ -1495,7 +1519,7 @@ def draw():
     Entity.currentIndex -= entitiesRemoved
     Entity.entities = cloneList(entitiesCopy)
 
-    #player.mouseLine.renderBoundedLines()
+    player.mouseLine.renderBoundedLines()
 
 while running:
     for event in pygame.event.get():
