@@ -14,6 +14,7 @@ class ProjectileTemplate:
         invincibilityFrames=15,
         explodeAtEntity=False,
         seeking=False,
+        collisionDamage=True
     ):
         self.radius = radius
         self.bounceOnWall = bounceOnWall
@@ -28,6 +29,7 @@ class ProjectileTemplate:
         self.invincibilityFrames = invincibilityFrames
         self.explodeAtEntity = explodeAtEntity
         self.seeking = seeking
+        self.collisionDamage = collisionDamage
 
 projectileConstants = {
     "noAI": ProjectileTemplate(),
@@ -36,7 +38,7 @@ projectileConstants = {
     "slug": ProjectileTemplate(damage=20, radius=2),
     "piercer": ProjectileTemplate(damage=15, startSpeed=6, piercing=True),
     "rebounder" : ProjectileTemplate(damage=20, bounceOnWall=True),
-    "bomb" : ProjectileTemplate(damage=25, bounceOnWall=True, piercing=True, startSpeed=3),
+    "bomb" : ProjectileTemplate(damage=40, bounceOnWall=True, piercing=True, startSpeed=3, collisionDamage=False),
     "homingBullet": ProjectileTemplate(damage=20, homing=True),
     "missile": ProjectileTemplate(
         damage=25, startSpeed=3, explosionType="smallExplosion", radius=2
@@ -46,6 +48,7 @@ projectileConstants = {
     ),
     "seeker" : ProjectileTemplate(damage=20, startSpeed=6, seeking=True, bounceOnWall=True),
     "bounceSplitter" : ProjectileTemplate(damage=0, bounceOnWall=True),
+    "grenade" : ProjectileTemplate(damage=70, bounceOnWall=True, piercing=True, startSpeed=3, radius=4, collisionDamage=False),
     "splitter": ProjectileTemplate(damage=0, radius=2),
     "shell": ProjectileTemplate(damage=35, explosionType="mediumExplosion", radius=3),
     "homingMissile": ProjectileTemplate(
@@ -64,6 +67,7 @@ projectileConstants = {
     "laserSplitter": ProjectileTemplate(
         damage=40, shape="beam", radius=12, diameter=3, piercing=True, startSpeed=12
     ),
+    "pursuer" : ProjectileTemplate(damage=20, radius=3, startSpeed=8, seeking=True, bounceOnWall=True, piercing=True),
     "multiSplitter": ProjectileTemplate(damage=0, radius=3),
     "homingSplitter": ProjectileTemplate(
         damage=0, radius=3, piercing=True, startSpeed=3

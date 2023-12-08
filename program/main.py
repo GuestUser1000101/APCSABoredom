@@ -34,11 +34,13 @@ weapons = [
     "laserPulse",
     "seeker",
     "bounceSplitter",
+    "grenade",
     "splitter",
     "shell",
     "homingMissile",
     "laserBeam",
     "laserSplitter",
+    "pursuer",
     "multiSplitter",
     "homingSplitter",
     "rocket",
@@ -495,6 +497,7 @@ class Projectile:
         self.alreadySplit = False
         self.explodeAtEntity = projectileConstants[projectileType].explodeAtEntity
         self.seeking = projectileConstants[projectileType].seeking
+        self.collisionDamage = projectileConstants[projectileType].collisionDamage
         self.shootCooldown = 0
         self.line = (
             Line(
@@ -524,6 +527,10 @@ class Projectile:
                 self.explode(self.explosionType, target.pos)
             else:
                 self.explode(self.explosionType)
+        if self.seeking:
+            closest = self.findClosest(exceptions=[self.owner, target])
+            if closest != -1:
+                self.pointAtEntity(closest)
         self.collisionCount += 1
 
     def findClosest(self, radius=-1, entityType=-1, exceptions=[]):
@@ -644,7 +651,7 @@ class Projectile:
 
         if self.bounceOnWall:
             if self.pos.x >= width or self.pos.x <= 0:
-                closest = self.findClosest()
+                closest = self.findClosest(exceptions=[self])
                 if self.seeking and closest != -1:
                     self.pointAtEntity(closest)
                 else:
@@ -652,7 +659,7 @@ class Projectile:
                     self.vel.x = -self.vel.x
                 self.bounceCount += 1
             if self.pos.y >= height or self.pos.y <= 0:
-                closest = self.findClosest()
+                closest = self.findClosest(exceptions=[self])
                 if self.seeking and closest != -1:
                         self.pointAtEntity(self.findClosest())
                 else:
@@ -776,6 +783,13 @@ class Projectile:
             self.split(3, "rebounder", math.pi / 36)
             self.remove = True
 
+    def grenade(self):
+        if self.tick < 150:
+            self.radius -= 1/50
+        else:
+            self.explode("mediumExplosion")
+            self.remove = True
+
     def splitter(self):
         if self.alignedToClosest(200, math.pi / 18, 50):
             self.split(3, "bullet", math.pi / 36)
@@ -812,6 +826,10 @@ class Projectile:
         if not self.alreadySplit and self.alignedToClosest(100, math.pi / 36, 20):
             self.split(2, "laserPulse", math.pi / 18)
             self.alreadySplit = True
+
+    def pursuer(self):
+        if self.bounceCount + self.collisionCount > 10:
+            self.remove = True
 
     def multiSplitter(self):
         if self.alignedToClosest(200, math.pi / 18, 50):
@@ -1081,7 +1099,8 @@ class Entity:
                 )
             if projectile.owner != self and collisionCondition:
                 projectile.collideWithEntity(self)
-                self.damageRequest(projectile.damage, projectile.invincibilityFrames)
+                if projectile.collisionDamage:
+                    self.damageRequest(projectile.damage, projectile.invincibilityFrames)
                 return True
         return False
 
@@ -1445,10 +1464,10 @@ def draw():
     player.controller()
     player.update()
     player.render()
-    player.findClosestWall().renderPoint()
+    #player.findClosestWall().renderPoint()
 
-    graphVelocity()
-    player.vel.render(player.pos, 15)
+    #graphVelocity()
+    #player.vel.render(player.pos, 15)
 
     projectilesCopy = []
     projectilesRemoved = 0
@@ -1476,7 +1495,7 @@ def draw():
     Entity.currentIndex -= entitiesRemoved
     Entity.entities = cloneList(entitiesCopy)
 
-    player.mouseLine.renderBoundedLines()
+    #player.mouseLine.renderBoundedLines()
 
 while running:
     for event in pygame.event.get():
