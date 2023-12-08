@@ -414,6 +414,16 @@ class Line:
             self.p2.x += (self.p2.x - self.p1.x) * (multiplier - 1)
             self.p2.y += (self.p2.y - self.p1.y) * (multiplier - 1)
 
+    def setLength(self, direction, length):
+        thisLength = distance(self.p1, self.p2)
+        if thisLength != 0:
+            if direction == 1:
+                self.p1.x = self.p2.x + (self.p1.x - self.p2.x) / thisLength * length
+                self.p1.y = self.p2.y + (self.p1.y - self.p2.y) / thisLength * length
+            elif direction == 2:
+                self.p2.x = self.p1.x + (self.p2.x - self.p1.x) / thisLength * length
+                self.p2.y = self.p1.y + (self.p2.y - self.p1.y) / thisLength * length
+
     def render(self, color):
         vectorDiff = self.p1.difference(self.p2)
         points = (
@@ -1303,7 +1313,7 @@ class Controller:
         self.mouseLine.p1.y = mouseY
         self.mouseLine.p2 = self.pos
 
-        self.mouseLine.lengthen(1, 3)
+        self.mouseLine.setLength(1, 3000)
 
         if self.tick % (FPS / FPS) == 0:
             velocityTime[self.tick % len(velocityTime)] = (
