@@ -35,6 +35,7 @@ weapons = [
     "seeker",
     "bounceSplitter",
     "grenade",
+    "vibrator",
     "splitter",
     "shell",
     "homingMissile",
@@ -43,6 +44,7 @@ weapons = [
     "pursuer",
     "grenadeSplitter",
     "plasmaGrenade",
+    "pulser",
     "multiSplitter",
     "homingSplitter",
     "rocket",
@@ -562,6 +564,10 @@ class Projectile:
     def stopY(self):
         self.acc.y = -sign(self.vel.y) * self.maxAcc
 
+    def slow(self, coefficient):
+        self.acc.y = coefficient * self.maxVel * -math.sin(self.vel.angle())
+        self.acc.x = coefficient * self.maxVel * -math.cos(self.vel.angle())
+
     def findTargets(self, radius, entityType=-1):
         targets = []
         for entity in Entity.entities:
@@ -794,6 +800,19 @@ class Projectile:
             self.explode("mediumExplosion")
             self.remove = True
 
+    def vibrator(self):
+        if self.vel.magnitude() > 0.2:
+            self.slow(0.005)
+        else:
+            if self.initialTickSave == 0:
+                self.initialTickSave = self.tick
+                self.explode("smallShockwave")
+            elif self.tick == self.initialTickSave + 20:
+                self.explode("smallShockwave")
+            elif self.tick >= self.initialTickSave + 40:
+                self.explode("smallShockwave")
+                self.remove = True
+
     def splitter(self):
         if self.alignedToClosest(200, math.pi / 18, 50):
             self.split(3, "bullet", math.pi / 36)
@@ -854,6 +873,23 @@ class Projectile:
         else:
             self.explode("largeExplosion")
             self.remove = True
+
+    def pulser(self):
+        if self.vel.magnitude() > 0.2:
+            self.slow(0.005)
+        else:
+            if self.initialTickSave == 0:
+                self.initialTickSave = self.tick
+                self.explode("largeShockwave")
+            elif self.tick < self.initialTickSave + 240:
+                if (self.tick - self.initialTickSave) % 60 == 0:
+                    self.explode("largeShockwave")
+                    self.radius = 1
+                else:
+                    self.radius += 0.2
+            elif self.tick >= self.initialTickSave + 240:
+                self.explode("largeShockwave")
+                self.remove = True
 
     def multiSplitter(self):
         if self.alignedToClosest(200, math.pi / 18, 50):
@@ -953,15 +989,23 @@ class Projectile:
                     )
                 self.remove = True
 
-    def shockwave(self):
-        if self.tick < 30:
-            self.radius += 5
-        elif self.tick < 35:
+    def smallShockwave(self):
+        if self.tick < 20:
+            self.radius += 2
+        elif self.tick < 24:
             self.diameter -= 1
-            self.radius += 5
+            self.radius += 2
         else:
             self.remove = True
 
+    def largeShockwave(self):
+        if self.tick < 30:
+            self.radius += 3
+        elif self.tick < 39:
+            self.diameter -= 1
+            self.radius += 3
+        else:
+            self.remove = True
 
 class Entity:
     entities = []

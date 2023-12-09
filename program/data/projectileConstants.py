@@ -67,6 +67,14 @@ projectileConstants = {
         radius=4,
         collisionDamage=False,
     ),
+    "vibrator": ProjectileTemplate(
+        damage=30,
+        bounceOnWall=True,
+        piercing=True,
+        startSpeed=5,
+        radius=3,
+        collisionDamage=False,
+    ),
     "splitter": ProjectileTemplate(damage=0, radius=2),
     "shell": ProjectileTemplate(damage=35, explosionType="mediumExplosion", radius=3),
     "homingMissile": ProjectileTemplate(
@@ -86,8 +94,8 @@ projectileConstants = {
         damage=40, shape="beam", radius=12, diameter=3, piercing=True, startSpeed=12
     ),
     "pursuer": ProjectileTemplate(
-        damage=20,
-        radius=3,
+        damage=40,
+        radius=5,
         startSpeed=8,
         seeking=True,
         bounceOnWall=True,
@@ -100,6 +108,14 @@ projectileConstants = {
         piercing=True,
         startSpeed=5,
         radius=6,
+        collisionDamage=False,
+    ),
+    "pulser": ProjectileTemplate(
+        damage=50,
+        bounceOnWall=True,
+        piercing=True,
+        startSpeed=8,
+        radius=3,
         collisionDamage=False,
     ),
     "multiSplitter": ProjectileTemplate(damage=0, radius=3),
@@ -139,7 +155,14 @@ projectileConstants = {
     ),
     "smallExplosion": ProjectileTemplate(startSpeed=0, piercing=True, damage=20),
     "scatter": ProjectileTemplate(piercing=True),
-    "shockwave": ProjectileTemplate(
-        startSpeed=0, piercing=True, shape="ring", damage=10
+    "smallShockwave": ProjectileTemplate(
+        startSpeed=0,
+        piercing=True,
+        shape="ring",
+        damage=10,
+        diameter=5,
+    ),
+    "largeShockwave": ProjectileTemplate(
+        startSpeed=0, piercing=True, shape="ring", damage=20
     ),
 }
