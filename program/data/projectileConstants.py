@@ -115,7 +115,7 @@ projectileConstants = {
         bounceOnWall=True,
         piercing=True,
         startSpeed=8,
-        radius=3,
+        radius=6,
         collisionDamage=False,
     ),
     "multiSplitter": ProjectileTemplate(damage=0, radius=3),

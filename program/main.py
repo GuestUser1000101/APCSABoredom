@@ -878,15 +878,14 @@ class Projectile:
         if self.vel.magnitude() > 0.2:
             self.slow(0.005)
         else:
-            if self.initialTickSave == 0:
-                self.initialTickSave = self.tick
-                self.explode("largeShockwave")
-            elif self.tick < self.initialTickSave + 240:
-                if (self.tick - self.initialTickSave) % 60 == 0:
+            if self.tick < self.initialTickSave + 305:
+                if (self.tick - self.initialTickSave) % 60 == 5:
                     self.explode("largeShockwave")
                     self.radius = 1
+                elif (self.tick - self.initialTickSave) % 60 < 5:
+                    self.radius -= 2
                 else:
-                    self.radius += 0.2
+                    self.radius += 0.1
             elif self.tick >= self.initialTickSave + 240:
                 self.explode("largeShockwave")
                 self.remove = True
@@ -1481,7 +1480,7 @@ def draw():
     #    Entity.entities[-1].maxVel = 0.4
     #    Entity.entities[-1].maxAcc = 0.04
 
-    if q_tick == 1:
+    if q_key:
         Entity.entities.append(
             Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "shooter")
         )
