@@ -40,7 +40,7 @@ projectileConstants = {
     "piercer": ProjectileTemplate(damage=15, startSpeed=6, piercing=True),
     "rebounder": ProjectileTemplate(damage=20, bounceOnWall=True),
     "bomb": ProjectileTemplate(
-        damage=40, bounceOnWall=True, piercing=True, startSpeed=3, collisionDamage=False
+        damage=40, bounceOnWall=True, piercing=True, startSpeed=3, collisionDamage=False, invincibilityFrames=0
     ),
     "homingBullet": ProjectileTemplate(damage=20, homing=True),
     "missile": ProjectileTemplate(
@@ -58,7 +58,7 @@ projectileConstants = {
     "seeker": ProjectileTemplate(
         damage=20, startSpeed=6, seeking=True, bounceOnWall=True, radius=2
     ),
-    "bounceSplitter": ProjectileTemplate(damage=0, bounceOnWall=True),
+    "bounceSplitter": ProjectileTemplate(damage=0, bounceOnWall=True, invincibilityFrames=0),
     "grenade": ProjectileTemplate(
         damage=70,
         bounceOnWall=True,
@@ -75,7 +75,7 @@ projectileConstants = {
         radius=3,
         collisionDamage=False,
     ),
-    "splitter": ProjectileTemplate(damage=0, radius=2),
+    "splitter": ProjectileTemplate(damage=0, radius=2, invincibilityFrames=0),
     "shell": ProjectileTemplate(damage=35, explosionType="mediumExplosion", radius=3),
     "homingMissile": ProjectileTemplate(
         damage=25, startSpeed=3, explosionType="smallExplosion", homing=True, radius=2
@@ -109,6 +109,7 @@ projectileConstants = {
         startSpeed=5,
         radius=6,
         collisionDamage=False,
+        invincibilityFrames=0
     ),
     "pulser": ProjectileTemplate(
         damage=50,

@@ -450,8 +450,6 @@ class Line:
         pygame.draw.circle(screen, color, self.p1.array(), self.diameter / 2)
         pygame.draw.circle(screen, color, self.p2.array(), self.diameter / 2)
 
-        # pygame.draw.line(screen, color, self.p1.array(), self.p2.array(), self.diameter)
-
 class Projectile:
     projectiles = []
     currentIndex = 0
@@ -1447,45 +1445,18 @@ class Controller:
 
 
 player = Controller()
-# exampleEntity = Entity()
-# exampleEntity.pos.x = 200
-# exampleEntity.pos.y = 200
-# Entity.entities.append(exampleEntity)
-
-# for i in range(50):
-#    Entity.entities.append(Entity(random.randint(0, width), random.randint(0, height), "scared"))
-#    Entity.entities.append(Entity(random.randint(0, width), random.randint(0, height), "scared"))
-#    Entity.entities.append(Entity(random.randint(0, width), random.randint(0, height), "basic"))
-#    Entity.entities[-1].target = Entity.entities[-2]
-#    Entity.entities[-2].target = Entity.entities[-1]
-#    Entity.entities[-3].target = Entity.entities[-1]
-#
-#    Entity.entities[-1].maxVel = 0.4
-#    Entity.entities[-1].maxAcc = 0.04
-
 
 def draw():
     global weaponSelection
 
     screen.fill((0, 0, 0))
 
-    # if random.randint(0, 100) > 98:
-    #    Entity.entities.append(Entity(random.randint(0, width), random.randint(0, height), "scared"))
-    #    Entity.entities.append(Entity(random.randint(0, width), random.randint(0, height), "scared"))
-    #    Entity.entities.append(Entity(random.randint(0, width), random.randint(0, height), "basic"))
-    #    Entity.entities[-1].target = Entity.entities[-2]
-    #    Entity.entities[-2].target = Entity.entities[-1]
-    #    Entity.entities[-3].target = Entity.entities[-1]
-    #
-    #    Entity.entities[-1].maxVel = 0.4
-    #    Entity.entities[-1].maxAcc = 0.04
-
-    if q_key:
+    if q_tick == 1 or o_key:
         Entity.entities.append(
             Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "shooter")
         )
 
-    if e_tick == 1:
+    if e_tick == 1 or p_key:
         Entity.entities.append(
             Entity(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], "sniper")
         )
@@ -1562,7 +1533,7 @@ def draw():
     Entity.currentIndex -= entitiesRemoved
     Entity.entities = cloneList(entitiesCopy)
 
-    player.mouseLine.renderBoundedLines()
+    #player.mouseLine.renderBoundedLines()
 
 while running:
     for event in pygame.event.get():
