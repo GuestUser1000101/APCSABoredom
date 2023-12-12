@@ -722,7 +722,9 @@ class Projectile:
     def gravitateEntities(self):
         if self.gravity and self.mass > 0:
             for entity in Entity.entities:
-                entity.vel.add(Vector(self.pos.x - entity.pos.x, self.pos.y - entity.pos.y).normalize(gravityConstant * self.mass / distance(self.pos, entity.pos)**2))
+                distanceToEntity = distance(self.pos, entity.pos)
+                if distanceToEntity > 0:
+                    entity.vel.add(Vector(self.pos.x - entity.pos.x, self.pos.y - entity.pos.y).normalize(gravityConstant * self.mass / distanceToEntity**2))
 
     def smallExplosion(self):
         if self.tick < 2:
@@ -1074,14 +1076,14 @@ class Entity:
         self.movementAcc.normalize(self.maxMovementAcc)
 
     def stop(self):
-        self.movementAcc.y = -sign(self.vel.y + self.movementVel.y) * self.maxMovementAcc
+        self.movementAcc.y = -sign(self.vel.x + self.movementVel.y) * self.maxMovementAcc
         self.movementAcc.x = -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
 
     def stopX(self):
         self.movementAcc.x = -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
 
     def stopY(self):
-        self.movementAcc.y = -sign(self.vel.y + self.movementVel.y) * self.maxMovementAcc
+        self.movementAcc.y = -sign(self.vel.x + self.movementVel.y) * self.maxMovementAcc
 
     def setTarget(self, target):
         self.target = target
@@ -1347,11 +1349,9 @@ class Entity:
             if distanceToTarget < 1000 and distanceToTarget > 150:
                 self.moveTowards(self.target.pos.shuffledVector(10))
             else:
-                #self.stop()
-                pass
+                self.stop()
         else:
-            #self.stop()
-            pass
+            self.stop()
 
         if self.projectileVulnerable:
             self.checkProjectileCollision()
