@@ -12,6 +12,7 @@ FPS = 60
 pygame.display.set_caption("test")
 
 width, height = 960, 540
+gravityConstant = 1000
 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 running = True
 mousetick = 0
@@ -51,6 +52,7 @@ weapons = [
     "homingShell",
     "laserCannon",
     "laserField",
+    "blackhole",
 ]
 
 alphabet = [
@@ -501,6 +503,8 @@ class Projectile:
         self.seeking = projectileConstants[projectileType].seeking
         self.collisionDamage = projectileConstants[projectileType].collisionDamage
         self.shootCooldown = 0
+        self.mass = projectileConstants[projectileType].mass
+        self.gravity = projectileConstants[projectileType].gravity
         self.line = (
             Line(
                 self.pos,
@@ -681,10 +685,12 @@ class Projectile:
             ):
                 self.remove = True
 
+        self.gravitateEntities()
+
         exec(f"""self.{self.type}()""")
 
     def alignedToClosest(self, maxDistance, minAngleDiff, minDistance):
-        closestEntity = self.findClosest(self.targetType)
+        closestEntity = self.findClosest(entityType=self.targetType)
         if closestEntity != -1 and closestEntity != self.owner:
             distanceVector = Vector(
                 closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y
@@ -712,6 +718,11 @@ class Projectile:
 
         Projectile.summonByVector(pos.x, pos.y, 0, 0, projectileType=explosionType)
         Projectile.projectiles[-1].damage = self.damage
+
+    def gravitateEntities(self):
+        if self.gravity and self.mass > 0:
+            for entity in Entity.entities:
+                entity.vel.add(Vector(self.pos.x - entity.pos.x, self.pos.y - entity.pos.y).normalize(gravityConstant * self.mass / distance(self.pos, entity.pos)**2))
 
     def smallExplosion(self):
         if self.tick < 2:
@@ -962,29 +973,9 @@ class Projectile:
         
         self.radius = 2 * math.sin(self.tick / 10) + 5
 
-    def bouncy(self):
-        if self.bounceCount > 3:
+    def blackhole(self):
+        if self.tick > 300:
             self.remove = True
-
-    def scatter(self):
-        closestEntity = self.findClosest(self.targetType)
-        if closestEntity != -1 and closestEntity != self.owner:
-            distanceVector = Vector(
-                closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y
-            )
-            if (
-                distanceVector.magnitude() < 200
-                and abs(self.vel.angle() - distanceVector.angle()) < math.pi / 12
-            ) or distanceVector.magnitude() < 50:
-                for i in range(3):
-                    Projectile.summonByVector(
-                        self.pos.x,
-                        self.pos.y,
-                        self.vel.angle() + math.pi * (i - 1) / 36,
-                        0,
-                        projectileType="missile",
-                    )
-                self.remove = True
 
     def smallShockwave(self):
         if self.tick < 20:
@@ -1012,8 +1003,10 @@ class Entity:
         self.pos = Vector(x, y)
         self.vel = Vector(0, 0)
         self.acc = Vector(0, 0)
-        self.maxAcc = 0.4
-        self.maxVel = 2
+        self.movementAcc = Vector(0, 0)
+        self.movementVel = Vector(0, 0)
+        self.maxMovementAcc = 0.4
+        self.maxMovementVel = 2
         self.tick = 0
         self.remove = False
         self.target = 0
@@ -1034,15 +1027,16 @@ class Entity:
         self.health = 100
         self.maxHealth = 100
         self.angle = 0
+        self.mass = 1
         Entity.currentIndex += 1
 
     def __str__(self):
         return "Entity #" + str(self.index) + " of type " + self.type
 
     def moveTowards(self, vector):
-        self.acc.x = vector.x - self.pos.x
-        self.acc.y = vector.y - self.pos.y
-        self.acc.normalize(self.maxAcc)
+        self.movementAcc.x = vector.x - self.pos.x
+        self.movementAcc.y = vector.y - self.pos.y
+        self.movementAcc.normalize(self.maxMovementAcc)
 
     def moveAwayMultiple(self, vectors, radius=-1):
         if len(vectors) != 0:
@@ -1075,19 +1069,19 @@ class Entity:
             self.acc = Vector.fromAngle(toRadians(largestAngle), self.maxAcc)
 
     def moveAway(self, vector):
-        self.acc.x = self.pos.x - vector.x
-        self.acc.y = self.pos.y - vector.y
-        self.acc.normalize(self.maxAcc)
+        self.movementAcc.x = self.pos.x - vector.x
+        self.movementAcc.y = self.pos.y - vector.y
+        self.movementAcc.normalize(self.maxMovementAcc)
 
     def stop(self):
-        self.acc.y = -sign(self.vel.y) * self.maxAcc
-        self.acc.x = -sign(self.vel.x) * self.maxAcc
+        self.movementAcc.y = -sign(self.vel.y + self.movementVel.y) * self.maxMovementAcc
+        self.movementAcc.x = -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
 
     def stopX(self):
-        self.acc.x = -sign(self.vel.x) * self.maxAcc
+        self.movementAcc.x = -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
 
     def stopY(self):
-        self.acc.y = -sign(self.vel.y) * self.maxAcc
+        self.movementAcc.y = -sign(self.vel.y + self.movementVel.y) * self.maxMovementAcc
 
     def setTarget(self, target):
         self.target = target
@@ -1204,17 +1198,23 @@ class Entity:
         if self.shootTick > 0:
             self.shootTick -= 1
 
-        if self.acc.magnitude() > self.maxAcc:
-            self.acc.normalize(self.maxAcc)
+        if self.movementAcc.magnitude() > self.maxMovementAcc:
+            self.movementAcc.normalize(self.maxMovementAcc)
+
+        self.movementVel.add(self.movementAcc)
 
         self.vel.add(self.acc)
 
-        if self.vel.magnitude() > self.maxVel:
-            self.vel.normalize(self.maxVel)
-        elif round(self.vel.magnitude(), 5) < self.maxAcc:
+        if self.movementVel.magnitude() > self.maxMovementVel:
+            self.movementVel.normalize(self.maxMovementVel)
+        elif round(self.movementVel.magnitude(), 5) < self.maxMovementAcc:
+            self.movementVel.zero()
+
+        if round(self.vel.magnitude(), 5) < 0.1:
             self.vel.zero()
 
         self.pos.add(self.vel)
+        self.pos.add(self.movementVel)
 
         if self.pos.x > width or self.pos.x < 0:
             self.pos.x -= self.vel.x
@@ -1347,9 +1347,11 @@ class Entity:
             if distanceToTarget < 1000 and distanceToTarget > 150:
                 self.moveTowards(self.target.pos.shuffledVector(10))
             else:
-                self.stop()
+                #self.stop()
+                pass
         else:
-            self.stop()
+            #self.stop()
+            pass
 
         if self.projectileVulnerable:
             self.checkProjectileCollision()

@@ -15,6 +15,8 @@ class ProjectileTemplate:
         explodeAtEntity=False,
         seeking=False,
         collisionDamage=True,
+        mass=1,
+        gravity=False
     ):
         self.radius = radius
         self.bounceOnWall = bounceOnWall
@@ -30,6 +32,8 @@ class ProjectileTemplate:
         self.explodeAtEntity = explodeAtEntity
         self.seeking = seeking
         self.collisionDamage = collisionDamage
+        self.mass=mass
+        self.gravity=gravity
 
 
 projectileConstants = {
@@ -166,4 +170,7 @@ projectileConstants = {
     "largeShockwave": ProjectileTemplate(
         startSpeed=0, piercing=True, shape="ring", damage=20
     ),
+    "blackhole" : ProjectileTemplate(
+        startSpeed=0, damage=100, piercing=True, radius = 10, mass=10, gravity=True
+    )
 }
