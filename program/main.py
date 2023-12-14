@@ -1491,8 +1491,8 @@ class Widgit:
 
     @staticmethod
     def fromArray(array, pos, widgitType):
-        widgitWidth = 10
-        widgitHeight = 10
+        widgitWidth = 20
+        widgitHeight = 20
         widgits = []
         indexCounter = 0
         for position in array:
