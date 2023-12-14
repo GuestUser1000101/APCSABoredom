@@ -6,6 +6,7 @@ import sys
 import random
 import math
 from data.projectileConstants import *
+from data.guiConstants import *
 
 clock = pygame.time.Clock()
 FPS = 60
@@ -1445,8 +1446,91 @@ class Controller:
         else:
             self.acc.x = -sign(self.vel.x) * self.maxAcc
 
+class Widgit:
+    def __init__(self, parentPos, x, y, width, height, widgitType = "none", index = 0):
+        self.parentPos = parentPos
+        self.relativePos = Vector(x, y)
+        self.width, self.height = width, height
+        self.widgitType = widgitType
+        self.clickStatus = False
+        self.holdStatus = False
+        self.hoverStatus = False
+        self.selectedStatus = False
+        self.hidden = False
+        self.rect = Rect(self.relativePos.x + self.parentPos.x, self.relativePos.y + self.parentPos.x, self.width, self.height)
+        self.index = index
+    
+    def update(self):
+        self.rect.x = self.relativePos.x + self.parentPos.x
+        self.rect.y = self.relativePos.y + self.parentPos.y
+        self.rect.width = self.width
+        self.rect.height = self.height
+
+        self.hoverStatus = self.rect.collidepoint(mouseX, mouseY)
+        self.holdStatus = mousehold and self.hoverStatus
+        self.clickStatus = mousetick and self.hoverStatus
+        if self.clickStatus:
+            self.selectedStatus = not self.selectedStatus
+        
+        exec(f"self.{self.widgitType}()")
+
+    def render(self):
+        borderColor = (175, 175, 175) if self.selectedStatus else (130, 130, 130)
+        if self.hoverStatus:
+            fillColor = (160, 160, 160)
+        elif self.selectedStatus:
+            fillColor = (130, 130, 130)
+        else:
+            fillColor = (110, 110, 110)
+
+        pygame.draw.rect(screen, fillColor, self.rect)
+        pygame.draw.rect(screen, borderColor, self.rect, 3)
+
+    def none(self):
+        pass
+
+    @staticmethod
+    def fromArray(array, pos, widgitType):
+        widgitWidth = 10
+        widgitHeight = 10
+        widgits = []
+        indexCounter = 0
+        for position in array:
+            widgits.append(Widgit(pos, position[0] - widgitWidth / 2, position[1] - widgitHeight / 2, widgitWidth, widgitHeight, widgitType, indexCounter))
+            indexCounter += 1
+
+        return widgits
+
+
+class Gui:
+    guis = []
+    def __init__(self, x, y, width, height, guiType = "none", widgits=[]):
+        self.pos = Vector(x, y)
+        self.width, self.height = width, height
+        self.hidden = False
+        self.widgits = widgits
+        self.guiType = guiType
+    
+    def render(self):
+        pygame.draw.rect(screen, (50, 50, 50), Rect(self.pos.x, self.pos.y, self.width, self.height))
+        pygame.draw.rect(screen, (100, 100, 100), Rect(self.pos.x, self.pos.y, self.width, self.height), 5)
+        for widgit in self.widgits:
+            widgit.update()
+            widgit.render()
+
+        exec(f"self.{self.guiType}()")
+
+    @staticmethod
+    def guiFromTemplate(x, y, guiType):
+        guiTemplate = guiConstants[guiType]
+        return Gui(x, y, guiTemplate.width, guiTemplate.height, guiType, Widgit.fromArray(guiTemplate.widgits, Vector(x, y), "none"))
+
+    def weaponSelect(self):
+        pass
 
 player = Controller()
+
+testGui = Gui.guiFromTemplate(10, 10, "weaponSelect")
 
 def draw():
     global weaponSelection
@@ -1534,6 +1618,8 @@ def draw():
             entitiesRemoved += 1
     Entity.currentIndex -= entitiesRemoved
     Entity.entities = cloneList(entitiesCopy)
+
+    testGui.render()
 
     #player.mouseLine.renderBoundedLines()
 
