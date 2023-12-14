@@ -1475,16 +1475,16 @@ class Widgit:
         exec(f"self.{self.widgitType}()")
 
     def render(self):
-        borderColor = (175, 175, 175) if self.selectedStatus else (130, 130, 130)
+        borderColor = (175, 175, 175) if self.selectedStatus else (120, 120, 120)
         if self.hoverStatus:
             fillColor = (160, 160, 160)
         elif self.selectedStatus:
             fillColor = (130, 130, 130)
         else:
-            fillColor = (110, 110, 110)
+            fillColor = (100, 100, 100)
 
         pygame.draw.rect(screen, fillColor, self.rect)
-        pygame.draw.rect(screen, borderColor, self.rect, 3)
+        pygame.draw.rect(screen, borderColor, self.rect, 2)
 
     def none(self):
         pass
