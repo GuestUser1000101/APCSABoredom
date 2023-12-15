@@ -1522,6 +1522,9 @@ class Gui:
 
         exec(f"self.{self.guiType}()")
 
+    def setWidgitRequirements(self, dependentWidgitIndex, independentWidgitIndex):
+        self.widgits[dependentWidgitIndex].lockStatus = not self.widgits[independentWidgitIndex].selectedStatus or self.widgits[independentWidgitIndex].lockStatus
+
     @staticmethod
     def guiFromTemplate(x, y, guiType):
         guiTemplate = guiConstants[guiType]
@@ -1529,11 +1532,19 @@ class Gui:
 
     def weaponSelect(self):
         for i in range(1, 4):
-            self.widgits[i].lockStatus = self.widgits[0].selectedStatus
+            self.setWidgitRequirements(i, 0)
         for i in range(6):
-            self.widgits[4 + i].lockStatus = self.widgits[i // 2 + 1].selectedStatus
-        self.widgits[10].lockStatus = self.widgits[i // 2 + 1].selectedStatus
-        
+            self.setWidgitRequirements(4 + i, i // 2 + 1)
+        for i in range(10, 14):
+            self.setWidgitRequirements(i, i // 2 - 1)
+        self.setWidgitRequirements(14, 6)
+        self.setWidgitRequirements(15, 7)
+        self.setWidgitRequirements(16, 8)
+        self.setWidgitRequirements(17, 9)
+        self.setWidgitRequirements(18, 9)
+        for i in range(19, 28):
+            self.setWidgitRequirements(i, i - 9)
+
 
 player = Controller()
 
