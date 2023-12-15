@@ -1456,6 +1456,7 @@ class Widgit:
         self.holdStatus = False
         self.hoverStatus = False
         self.selectedStatus = False
+        self.lockStatus = False
         self.hidden = False
         self.rect = Rect(self.relativePos.x + self.parentPos.x, self.relativePos.y + self.parentPos.x, self.width, self.height)
         self.index = index
@@ -1470,13 +1471,15 @@ class Widgit:
         self.holdStatus = mousehold and self.hoverStatus
         self.clickStatus = mousetick and self.hoverStatus
         if self.clickStatus:
-            self.selectedStatus = not self.selectedStatus
+            self.selectedStatus = not self.selectedStatus and not self.lockStatus
         
         exec(f"self.{self.widgitType}()")
 
     def render(self):
-        borderColor = (175, 175, 175) if self.selectedStatus else (120, 120, 120)
-        if self.hoverStatus:
+        borderColor = (175, 175, 175) if self.selectedStatus and not self.lockStatus else (120, 120, 120)
+        if self.lockStatus:
+            fillColor = (120, 120, 120)
+        elif self.hoverStatus:
             fillColor = (160, 160, 160)
         elif self.selectedStatus:
             fillColor = (130, 130, 130)
@@ -1500,7 +1503,6 @@ class Widgit:
             indexCounter += 1
 
         return widgits
-
 
 class Gui:
     guis = []
@@ -1526,7 +1528,12 @@ class Gui:
         return Gui(x, y, guiTemplate.width, guiTemplate.height, guiType, Widgit.fromArray(guiTemplate.widgits, Vector(x, y), "none"))
 
     def weaponSelect(self):
-        pass
+        for i in range(1, 4):
+            self.widgits[i].lockStatus = self.widgits[0].selectedStatus
+        for i in range(6):
+            self.widgits[4 + i].lockStatus = self.widgits[i // 2 + 1].selectedStatus
+        self.widgits[10].lockStatus = self.widgits[i // 2 + 1].selectedStatus
+        
 
 player = Controller()
 
