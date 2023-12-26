@@ -66,7 +66,7 @@ projectileConstants = {
     ),
     "bounceSplitter": ProjectileTemplate(damage=0, bounceOnWall=True, invincibilityFrames=0),
     "grenade": ProjectileTemplate(
-        damage=70,
+        damage=60,
         bounceOnWall=True,
         piercing=True,
         startSpeed=3,
@@ -75,7 +75,7 @@ projectileConstants = {
         cooldown=40
     ),
     "vibrator": ProjectileTemplate(
-        damage=30,
+        damage=40,
         bounceOnWall=True,
         piercing=True,
         startSpeed=5,
@@ -114,7 +114,7 @@ projectileConstants = {
     ),
     "grenadeSplitter": ProjectileTemplate(damage=0, bounceOnWall=True),
     "plasmaGrenade": ProjectileTemplate(
-        damage=100,
+        damage=80,
         bounceOnWall=True,
         piercing=True,
         startSpeed=5,
@@ -124,7 +124,7 @@ projectileConstants = {
         cooldown=60
     ),
     "pulser": ProjectileTemplate(
-        damage=50,
+        damage=70,
         bounceOnWall=True,
         piercing=True,
         startSpeed=8,
@@ -166,10 +166,10 @@ projectileConstants = {
         startSpeed=0, piercing=True, damage=10, invincibilityFrames=2
     ),
     "largeExplosion": ProjectileTemplate(
-        startSpeed=0, piercing=True, damage=60, invincibilityFrames=60
+        startSpeed=0, piercing=True, damage=60, invincibilityFrames=120
     ),
     "mediumExplosion": ProjectileTemplate(
-        startSpeed=0, piercing=True, damage=40, invincibilityFrames=45
+        startSpeed=0, piercing=True, damage=40, invincibilityFrames=60
     ),
     "smallExplosion": ProjectileTemplate(startSpeed=0, piercing=True, damage=20),
     "scatter": ProjectileTemplate(piercing=True),

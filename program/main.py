@@ -629,6 +629,9 @@ class Projectile:
         self.acc.y = coefficient * self.maxVel * -math.sin(self.vel.angle())
         self.acc.x = coefficient * self.maxVel * -math.cos(self.vel.angle())
 
+    def setSpeed(self, speed):
+        self.vel.normalize(speed)
+
     def findTargets(self, radius, entityType=-1):
         targets = []
         for entity in Entity.entities:
@@ -876,7 +879,11 @@ class Projectile:
         pass
 
     def seeker(self):
-        if self.bounceCount > 10:
+        self.damage = 20 + self.bounceCount * 5
+        self.radius = 2 + self.bounceCount * 0.5
+        self.maxVel = 6 + self.bounceCount * 0.5
+        self.setSpeed(6 + self.bounceCount * 0.5)
+        if self.bounceCount > 5:
             self.remove = True
 
     def bounceSplitter(self):
@@ -885,8 +892,13 @@ class Projectile:
             self.remove = True
 
     def grenade(self):
-        if self.tick < 150:
+        if self.tick < 120:
             self.radius -= 1 / 50
+        elif self.tick < 150:
+            self.radius -= 1 / 50
+            if self.alignedToClosest(0, math.pi / 36, 10):
+                self.explode("mediumExplosion")
+                self.remove = True
         else:
             self.explode("mediumExplosion")
             self.remove = True
@@ -1251,7 +1263,7 @@ class Entity:
                 )
             if projectile.owner != self and collisionCondition:
                 projectile.collideWithEntity(self)
-                if projectile.collisionDamage:
+                if projectile.collisionDamage and projectile.explosionType == "none":
                     self.damageRequest(
                         projectile.damage, projectile.invincibilityFrames
                     )
