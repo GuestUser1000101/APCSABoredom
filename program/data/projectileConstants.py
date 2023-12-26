@@ -16,7 +16,8 @@ class ProjectileTemplate:
         seeking=False,
         collisionDamage=True,
         mass=1,
-        gravity=False
+        gravity=False,
+        cooldown=30
     ):
         self.radius = radius
         self.bounceOnWall = bounceOnWall
@@ -34,6 +35,7 @@ class ProjectileTemplate:
         self.collisionDamage = collisionDamage
         self.mass=mass
         self.gravity=gravity
+        self.cooldown=cooldown
 
 
 projectileConstants = {
@@ -44,7 +46,7 @@ projectileConstants = {
     "piercer": ProjectileTemplate(damage=15, startSpeed=6, piercing=True),
     "rebounder": ProjectileTemplate(damage=20, bounceOnWall=True),
     "bomb": ProjectileTemplate(
-        damage=40, bounceOnWall=True, piercing=True, startSpeed=3, collisionDamage=False, invincibilityFrames=0
+        damage=40, bounceOnWall=True, piercing=True, startSpeed=3, collisionDamage=False, invincibilityFrames=0, cooldown=40
     ),
     "homingBullet": ProjectileTemplate(damage=20, homing=True),
     "missile": ProjectileTemplate(
@@ -60,7 +62,7 @@ projectileConstants = {
         invincibilityFrames=5,
     ),
     "seeker": ProjectileTemplate(
-        damage=20, startSpeed=6, seeking=True, bounceOnWall=True, radius=2, invincibilityFrames=5
+        damage=20, startSpeed=6, seeking=True, bounceOnWall=True, radius=2, invincibilityFrames=5, cooldown=40
     ),
     "bounceSplitter": ProjectileTemplate(damage=0, bounceOnWall=True, invincibilityFrames=0),
     "grenade": ProjectileTemplate(
@@ -70,6 +72,7 @@ projectileConstants = {
         startSpeed=3,
         radius=4,
         collisionDamage=False,
+        cooldown=40
     ),
     "vibrator": ProjectileTemplate(
         damage=30,
@@ -78,6 +81,7 @@ projectileConstants = {
         startSpeed=5,
         radius=3,
         collisionDamage=False,
+        cooldown=40
     ),
     "splitter": ProjectileTemplate(damage=0, radius=2, invincibilityFrames=0),
     "shell": ProjectileTemplate(damage=35, explosionType="mediumExplosion", radius=3),
@@ -93,6 +97,7 @@ projectileConstants = {
         damage=2,
         follow=True,
         invincibilityFrames=2,
+        cooldown=180
     ),
     "laserSplitter": ProjectileTemplate(
         damage=40, shape="beam", radius=12, diameter=3, piercing=True, startSpeed=12
@@ -105,6 +110,7 @@ projectileConstants = {
         bounceOnWall=True,
         piercing=True,
         invincibilityFrames=5,
+        cooldown=60
     ),
     "grenadeSplitter": ProjectileTemplate(damage=0, bounceOnWall=True),
     "plasmaGrenade": ProjectileTemplate(
@@ -114,7 +120,8 @@ projectileConstants = {
         startSpeed=5,
         radius=6,
         collisionDamage=False,
-        invincibilityFrames=0
+        invincibilityFrames=0,
+        cooldown=60
     ),
     "pulser": ProjectileTemplate(
         damage=50,
@@ -123,10 +130,11 @@ projectileConstants = {
         startSpeed=8,
         radius=6,
         collisionDamage=False,
+        cooldown=40
     ),
     "multiSplitter": ProjectileTemplate(damage=0, radius=3),
     "homingSplitter": ProjectileTemplate(
-        damage=0, radius=3, piercing=True, startSpeed=3
+        damage=0, radius=3, piercing=True, startSpeed=3, cooldown=60
     ),
     "rocket": ProjectileTemplate(
         damage=50,
@@ -135,6 +143,7 @@ projectileConstants = {
         shape="beam",
         radius=6,
         diameter=2,
+        cooldown=40
     ),
     "homingShell": ProjectileTemplate(
         damage=40, explosionType="mediumExplosion", homing=True, radius=3
@@ -149,9 +158,13 @@ projectileConstants = {
         follow=True,
         invincibilityFrames=2,
         explodeAtEntity=True,
+        cooldown=240
     ),
-    "laserField": ProjectileTemplate(damage=40, radius=4, piercing=True, startSpeed=6),
+    "laserField": ProjectileTemplate(damage=40, radius=4, piercing=True, startSpeed=6, cooldown=60),
     "bouncy": ProjectileTemplate(bounceOnWall=True),
+    "massiveExplosion": ProjectileTemplate(
+        startSpeed=0, piercing=True, damage=10, invincibilityFrames=2
+    ),
     "largeExplosion": ProjectileTemplate(
         startSpeed=0, piercing=True, damage=60, invincibilityFrames=60
     ),

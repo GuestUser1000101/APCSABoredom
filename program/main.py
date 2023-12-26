@@ -554,6 +554,7 @@ class Projectile:
         self.shootCooldown = 0
         self.mass = projectileConstants[projectileType].mass
         self.gravity = projectileConstants[projectileType].gravity
+        self.cooldown = projectileConstants[projectileType].cooldown
         self.line = (
             Line(
                 self.pos,
@@ -816,6 +817,23 @@ class Projectile:
         elif self.tick < 120:
             if self.radius > 0:
                 self.radius -= 2
+            else:
+                self.remove = True
+        else:
+            self.remove = True
+
+    def massiveExplosion(self):
+        if self.tick < 4:
+            self.radius += 80
+        elif self.tick < 40:
+            self.radius += (random.random() - 0.5) * 12
+            self.radius += 0.5
+        elif self.tick < 100:
+            self.radius += (random.random() - 0.5) * 12
+            self.radius -= 0.5
+        elif self.tick < 120:
+            if self.radius > 0:
+                self.radius -= 20
             else:
                 self.remove = True
         else:
@@ -1374,7 +1392,7 @@ class Entity:
 
             if distanceToTarget < 200:
                 if self.shootTick <= 0:
-                    projectileType = weapons[weaponSelection]
+                    projectileType = Gui.unlockedWeapons[weaponSelection]
                     Projectile.summonByVector(
                         self.pos.x,
                         self.pos.y,
@@ -1385,7 +1403,7 @@ class Entity:
                         self,
                         "sniper",
                     )
-                    self.shootTick = 30
+                    self.shootTick = projectileConstants[Gui.unlockedWeapons[weaponSelection]].cooldown
 
             if distanceToTarget < 1000 and distanceToTarget > 150:
                 self.moveTowards(self.target.pos.shuffledVector(10))
@@ -1408,7 +1426,7 @@ class Entity:
 
             if distanceToTarget < 200:
                 if self.shootTick <= 0:
-                    projectileType = weapons[weaponSelection]
+                    projectileType = Gui.unlockedWeapons[weaponSelection]
                     Projectile.summonByVector(
                         self.pos.x,
                         self.pos.y,
@@ -1419,7 +1437,7 @@ class Entity:
                         self,
                         "shooter",
                     )
-                    self.shootTick = 30
+                    self.shootTick = projectileConstants[Gui.unlockedWeapons[weaponSelection]].cooldown
 
             if distanceToTarget < 1000 and distanceToTarget > 150:
                 self.moveTowards(self.target.pos.shuffledVector(10))
@@ -1446,6 +1464,7 @@ class Controller:
         self.angle = 0
         self.weaponIndex = 0
         self.mouseLine = Line(Vector(mouseX, mouseY), self.pos)
+        self.cooldown = 0
 
     def __str__(self):
         return "The Player"
@@ -1473,6 +1492,9 @@ class Controller:
         self.mouseLine.p1.x = mouseX
         self.mouseLine.p1.y = mouseY
         self.mouseLine.p2 = self.pos
+
+        if self.cooldown > 0:
+            self.cooldown -= 1
 
         self.mouseLine.setLength(1, 3000)
 
@@ -1519,6 +1541,29 @@ class Controller:
             self.acc.x = self.maxAcc
         else:
             self.acc.x = -sign(self.vel.x) * self.maxAcc
+        
+        if self.cooldown <= 0 and mousehold:
+            closestPos = -1
+            closestDistance = 50
+            for entity in Entity.entities:
+                distanceToEntity = distance(entity.pos, Vector(mouseX, mouseY))
+                if distanceToEntity < closestDistance:
+                    closestDistance = distanceToEntity
+                    closestPos = entity.pos
+
+            shootAngle = math.atan2(closestPos.y - self.pos.y, closestPos.x - self.pos.x) if closestPos != -1 else self.angle
+
+            Projectile.summonByVector(
+                self.pos.x,
+                self.pos.y,
+                shootAngle,
+                0,
+                0,
+                Gui.unlockedWeapons[weaponSelection],
+                self,
+            )
+
+            self.cooldown = projectileConstants[Gui.unlockedWeapons[weaponSelection]].cooldown
 
 
 class Widgit:
@@ -1724,32 +1769,6 @@ def draw():
     if z_tick == 1:
         print(Gui.unlockedWeapons[weaponSelection])
 
-    closestPos = -1
-    closestDistance = 50
-    for entity in Entity.entities:
-        distanceToEntity = distance(entity.pos, Vector(mouseX, mouseY))
-        if distanceToEntity < closestDistance:
-            closestDistance = distanceToEntity
-            closestPos = entity.pos
-
-    if closestPos != -1:
-        shootAngle = math.atan2(
-            closestPos.y - player.pos.y, closestPos.x - player.pos.x
-        )
-    else:
-        shootAngle = math.atan2(mouseY - player.pos.y, mouseX - player.pos.x)
-
-    if mousetick:
-        Projectile.summonByVector(
-            player.pos.x,
-            player.pos.y,
-            shootAngle,
-            0,
-            0,
-            Gui.unlockedWeapons[weaponSelection],
-            player,
-        )
-
     player.controller()
     player.update()
     player.render()
@@ -1786,10 +1805,7 @@ def draw():
 
     testGui.render()
 
-    # player.mouseLine.renderBoundedLines()
-
-    renderImage(getImage("assets/weapons/laserCannon.png"), 0, 0, 1)
-
+    #player.mouseLine.renderBoundedLines()
 
 while running:
     for event in pygame.event.get():
@@ -1807,8 +1823,8 @@ while running:
             elif event.button == 3:
                 mousetick = 3
                 mousehold = 3
-            else:
-                mousehold = 0
+        elif event.type == pygame.MOUSEBUTTONUP:
+            mousehold = 0
 
     keys = pygame.key.get_pressed()
 
