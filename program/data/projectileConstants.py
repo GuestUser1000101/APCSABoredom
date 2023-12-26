@@ -60,7 +60,7 @@ projectileConstants = {
         invincibilityFrames=5,
     ),
     "seeker": ProjectileTemplate(
-        damage=20, startSpeed=6, seeking=True, bounceOnWall=True, radius=2
+        damage=20, startSpeed=6, seeking=True, bounceOnWall=True, radius=2, invincibilityFrames=5
     ),
     "bounceSplitter": ProjectileTemplate(damage=0, bounceOnWall=True, invincibilityFrames=0),
     "grenade": ProjectileTemplate(
@@ -104,6 +104,7 @@ projectileConstants = {
         seeking=True,
         bounceOnWall=True,
         piercing=True,
+        invincibilityFrames=5,
     ),
     "grenadeSplitter": ProjectileTemplate(damage=0, bounceOnWall=True),
     "plasmaGrenade": ProjectileTemplate(

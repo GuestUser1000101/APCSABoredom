@@ -31,14 +31,15 @@ weapons = [
     "piercer",
     "rebounder",
     "bomb",
-    "homingBullet",
+    "splitter",
     "missile",
+    "homingBullet",
     "laserPulse",
     "seeker",
     "bounceSplitter",
     "grenade",
     "vibrator",
-    "splitter",
+    "multiSplitter",
     "shell",
     "homingMissile",
     "laserBeam",
@@ -47,7 +48,6 @@ weapons = [
     "grenadeSplitter",
     "plasmaGrenade",
     "pulser",
-    "multiSplitter",
     "homingSplitter",
     "rocket",
     "homingShell",
@@ -201,6 +201,32 @@ def approachAngle(currentAngle, targetAngle, percentage):
     return currentAngle - smallestAngle * direction * percentage
 
 
+def getImage(file):
+    return pygame.image.load(file).convert_alpha()
+
+
+def withSolidColor(image, color):
+    newImage = image.copy()
+    for y in range(newImage.get_height()):
+        for x in range(newImage.get_width()):
+            pixel = newImage.get_at((x, y))
+            if len(pixel) >= 4 and pixel[3] > 0:
+                newImage.set_at((x, y), (color + tuple([pixel[3]])))
+
+    return newImage
+
+
+def renderImage(image, x, y, scale=1, color = "none"):
+    image = withSolidColor(image, color) if color != "none" else image
+    screen.blit(
+        pygame.transform.scale(
+            image,
+            (image.get_width() * scale, image.get_height() * scale),
+        ),
+        (x, y),
+    )
+
+
 class Vector:
     def __init__(self, x, y):
         self.x = x
@@ -282,7 +308,7 @@ class Vector:
     @staticmethod
     def fromVector(vector):
         return Vector(vector.x, vector.y)
-    
+
     def isOutOfBounds(self):
         return self.x < 0 or self.x > width or self.y < 0 or self.y > width
 
@@ -313,6 +339,7 @@ class Vector:
 
         return Vector(x, y)
 
+
 class Line:
     def __init__(self, p1, p2, diameter=1):
         self.p1 = p1
@@ -330,10 +357,10 @@ class Line:
 
     def getYIntercept(self):
         return self.p1.y - self.getSlope() * self.p1.x
-    
+
     def getY(self, x):
         return self.getSlope() * x + self.getYIntercept()
-    
+
     def getX(self, y):
         return (y - self.getYIntercept()) / self.getSlope()
 
@@ -382,35 +409,55 @@ class Line:
             closestPoint = closestXPoint
 
         return distance(center, closestPoint) < radius + self.diameter / 2
-    
+
     def getBoundedLinesX(self):
         lines = self.getBoundedLinesY()
         if self.p1.x < 0:
-            lines += Line(Vector(0, self.getY(0)), Vector(-self.p1.x, self.p1.y)).getBoundedLinesY()
+            lines += Line(
+                Vector(0, self.getY(0)), Vector(-self.p1.x, self.p1.y)
+            ).getBoundedLinesY()
         elif self.p1.x > width:
-            lines += Line(Vector(width, self.getY(width)), Vector(2 * width - self.p1.x, self.p1.y)).getBoundedLinesY()
+            lines += Line(
+                Vector(width, self.getY(width)),
+                Vector(2 * width - self.p1.x, self.p1.y),
+            ).getBoundedLinesY()
 
         if self.p2.x < 0:
-            lines += Line(Vector(0, self.getY(0)), Vector(-self.p2.x, self.p2.y)).getBoundedLinesY()
-        elif self.p2.x > width: 
-            lines += Line(Vector(width, self.getY(width)), Vector(2 * width - self.p2.x, self.p2.y)).getBoundedLinesY()
+            lines += Line(
+                Vector(0, self.getY(0)), Vector(-self.p2.x, self.p2.y)
+            ).getBoundedLinesY()
+        elif self.p2.x > width:
+            lines += Line(
+                Vector(width, self.getY(width)),
+                Vector(2 * width - self.p2.x, self.p2.y),
+            ).getBoundedLinesY()
 
         return lines
 
     def getBoundedLinesY(self):
         lines = [self]
         if self.p1.y < 0:
-            lines += Line(Vector(self.getX(0), 0), Vector(self.p1.x, -self.p1.y)).getBoundedLinesX()
+            lines += Line(
+                Vector(self.getX(0), 0), Vector(self.p1.x, -self.p1.y)
+            ).getBoundedLinesX()
         elif self.p1.y > height:
-            lines += Line(Vector(self.getX(height), height), Vector(self.p1.x, 2 * height - self.p1.y)).getBoundedLinesX()
+            lines += Line(
+                Vector(self.getX(height), height),
+                Vector(self.p1.x, 2 * height - self.p1.y),
+            ).getBoundedLinesX()
 
         if self.p2.y < 0:
-            lines += Line(Vector(self.getX(0), 0), Vector(self.p2.x, -self.p2.y)).getBoundedLinesX()
+            lines += Line(
+                Vector(self.getX(0), 0), Vector(self.p2.x, -self.p2.y)
+            ).getBoundedLinesX()
         elif self.p2.y > height:
-            lines += Line(Vector(self.getX(height), height), Vector(self.p2.x, 2 * height - self.p2.y)).getBoundedLinesX()
-        
+            lines += Line(
+                Vector(self.getX(height), height),
+                Vector(self.p2.x, 2 * height - self.p2.y),
+            ).getBoundedLinesX()
+
         return lines
-    
+
     def renderBoundedLines(self):
         for line in self.getBoundedLinesX():
             line.render((255, 0, 255))
@@ -452,6 +499,7 @@ class Line:
         pygame.draw.polygon(screen, color, points)
         pygame.draw.circle(screen, color, self.p1.array(), self.diameter / 2)
         pygame.draw.circle(screen, color, self.p2.array(), self.diameter / 2)
+
 
 class Projectile:
     projectiles = []
@@ -545,14 +593,23 @@ class Projectile:
         closestEntity = -1
         for entity in Entity.entities:
             typeCondition = entityType == entity.type if entityType != -1 else True
-            radiusCondition = distance(self.pos, entity.pos) <= radius if radius != -1 else True
-            exceptionCondition = not entity in exceptions if len(exceptions) > 0 else True
+            radiusCondition = (
+                distance(self.pos, entity.pos) <= radius if radius != -1 else True
+            )
+            exceptionCondition = (
+                not entity in exceptions if len(exceptions) > 0 else True
+            )
 
-            if typeCondition and radiusCondition and exceptionCondition and distance(self.pos, entity.pos) < closestDistance:
+            if (
+                typeCondition
+                and radiusCondition
+                and exceptionCondition
+                and distance(self.pos, entity.pos) < closestDistance
+            ):
                 closestDistance = distance(self.pos, entity.pos)
                 closestEntity = entity
         return closestEntity
-    
+
     def pointAtEntity(self, entity):
         entityVector = Vector(entity.pos.x - self.pos.x, entity.pos.y - self.pos.y)
         self.vel = self.vel.rotate(entityVector.angle() - self.vel.angle())
@@ -672,7 +729,7 @@ class Projectile:
             if self.pos.y >= height or self.pos.y <= 0:
                 closest = self.findClosest(exceptions=[self])
                 if self.seeking and closest != -1:
-                        self.pointAtEntity(self.findClosest())
+                    self.pointAtEntity(self.findClosest())
                 else:
                     self.pos.y -= self.vel.y
                     self.vel.y = -self.vel.y
@@ -725,7 +782,11 @@ class Projectile:
             for entity in Entity.entities:
                 distanceToEntity = distance(self.pos, entity.pos)
                 if distanceToEntity > 0:
-                    entity.vel.add(Vector(self.pos.x - entity.pos.x, self.pos.y - entity.pos.y).normalize(gravityConstant * self.mass / distanceToEntity**2))
+                    entity.vel.add(
+                        Vector(
+                            self.pos.x - entity.pos.x, self.pos.y - entity.pos.y
+                        ).normalize(gravityConstant * self.mass / distanceToEntity**2)
+                    )
 
     def smallExplosion(self):
         if self.tick < 2:
@@ -807,7 +868,7 @@ class Projectile:
 
     def grenade(self):
         if self.tick < 150:
-            self.radius -= 1/50
+            self.radius -= 1 / 50
         else:
             self.explode("mediumExplosion")
             self.remove = True
@@ -873,12 +934,12 @@ class Projectile:
 
     def plasmaGrenade(self):
         if self.tick < 150:
-            self.radius -= 1/100
+            self.radius -= 1 / 100
         elif self.tick < 300:
             if self.tick % 60 > 30:
-                self.radius += 1/5
+                self.radius += 1 / 5
             else:
-                self.radius -= 1/5
+                self.radius -= 1 / 5
             if self.alignedToClosest(0, math.pi / 36, 25):
                 self.explode("largeExplosion")
                 self.remove = True
@@ -964,7 +1025,9 @@ class Projectile:
     def laserField(self):
         closestEntity = self.findClosest()
         if closestEntity != -1 and self.shootCooldown <= 0:
-            vectorToClosest = Vector(closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y)
+            vectorToClosest = Vector(
+                closestEntity.pos.x - self.pos.x, closestEntity.pos.y - self.pos.y
+            )
             Projectile.summonByVector(
                 self.pos.x,
                 self.pos.y,
@@ -973,7 +1036,7 @@ class Projectile:
                 owner=self.owner,
             )
             self.shootCooldown = 20
-        
+
         self.radius = 2 * math.sin(self.tick / 10) + 5
 
     def blackhole(self):
@@ -997,6 +1060,7 @@ class Projectile:
             self.radius += 3
         else:
             self.remove = True
+
 
 class Entity:
     entities = []
@@ -1077,14 +1141,22 @@ class Entity:
         self.movementAcc.normalize(self.maxMovementAcc)
 
     def stop(self):
-        self.movementAcc.y = -sign(self.vel.x + self.movementVel.y) * self.maxMovementAcc
-        self.movementAcc.x = -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
+        self.movementAcc.y = (
+            -sign(self.vel.x + self.movementVel.y) * self.maxMovementAcc
+        )
+        self.movementAcc.x = (
+            -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
+        )
 
     def stopX(self):
-        self.movementAcc.x = -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
+        self.movementAcc.x = (
+            -sign(self.vel.x + self.movementVel.x) * self.maxMovementAcc
+        )
 
     def stopY(self):
-        self.movementAcc.y = -sign(self.vel.x + self.movementVel.y) * self.maxMovementAcc
+        self.movementAcc.y = (
+            -sign(self.vel.x + self.movementVel.y) * self.maxMovementAcc
+        )
 
     def setTarget(self, target):
         self.target = target
@@ -1162,7 +1234,9 @@ class Entity:
             if projectile.owner != self and collisionCondition:
                 projectile.collideWithEntity(self)
                 if projectile.collisionDamage:
-                    self.damageRequest(projectile.damage, projectile.invincibilityFrames)
+                    self.damageRequest(
+                        projectile.damage, projectile.invincibilityFrames
+                    )
                 return True
         return False
 
@@ -1446,8 +1520,11 @@ class Controller:
         else:
             self.acc.x = -sign(self.vel.x) * self.maxAcc
 
+
 class Widgit:
-    def __init__(self, parentPos, x, y, width, height, widgitType = "none", index = 0):
+    def __init__(
+        self, parentPos, x, y, width, height, widgitType="none", index=0, image="none"
+    ):
         self.parentPos = parentPos
         self.relativePos = Vector(x, y)
         self.width, self.height = width, height
@@ -1458,9 +1535,15 @@ class Widgit:
         self.selectedStatus = False
         self.lockStatus = False
         self.hidden = False
-        self.rect = Rect(self.relativePos.x + self.parentPos.x, self.relativePos.y + self.parentPos.x, self.width, self.height)
+        self.rect = Rect(
+            self.relativePos.x + self.parentPos.x,
+            self.relativePos.y + self.parentPos.x,
+            self.width,
+            self.height,
+        )
         self.index = index
-    
+        self.image = image
+
     def update(self):
         self.rect.x = self.relativePos.x + self.parentPos.x
         self.rect.y = self.relativePos.y + self.parentPos.y
@@ -1471,12 +1554,24 @@ class Widgit:
         self.holdStatus = mousehold and self.hoverStatus
         self.clickStatus = mousetick and self.hoverStatus
         if self.clickStatus:
-            self.selectedStatus = not self.selectedStatus and not self.lockStatus
-        
+            self.selectedStatus = not self.selectedStatus
+
+        if self.lockStatus:
+            self.selectedStatus = False
+
         exec(f"self.{self.widgitType}()")
 
     def render(self):
-        borderColor = (175, 175, 175) if self.selectedStatus and not self.lockStatus else (120, 120, 120)
+        borderColor = (
+            (175, 175, 175)
+            if self.selectedStatus and not self.lockStatus
+            else (120, 120, 120)
+        )
+        imageColor = (
+            (75, 75, 75)
+            if self.selectedStatus and not self.lockStatus
+            else (50, 50, 50)
+        )
         if self.lockStatus:
             fillColor = (120, 120, 120)
         elif self.hoverStatus:
@@ -1489,6 +1584,15 @@ class Widgit:
         pygame.draw.rect(screen, fillColor, self.rect)
         pygame.draw.rect(screen, borderColor, self.rect, 2)
 
+        if self.image != "none":
+            renderImage(
+                self.image,
+                self.relativePos.x + self.parentPos.x + (self.width - self.image.get_width()) / 2,
+                self.relativePos.y + self.parentPos.y + (self.height - self.image.get_height()) / 2,
+                1,
+                imageColor
+            )
+
     def none(self):
         pass
 
@@ -1499,23 +1603,43 @@ class Widgit:
         widgits = []
         indexCounter = 0
         for position in array:
-            widgits.append(Widgit(pos, position[0] - widgitWidth / 2, position[1] - widgitHeight / 2, widgitWidth, widgitHeight, widgitType, indexCounter))
+            widgits.append(
+                Widgit(
+                    pos,
+                    position[0] - widgitWidth / 2,
+                    position[1] - widgitHeight / 2,
+                    widgitWidth,
+                    widgitHeight,
+                    widgitType,
+                    indexCounter,
+                )
+            )
             indexCounter += 1
 
         return widgits
 
+
 class Gui:
     guis = []
-    def __init__(self, x, y, width, height, guiType = "none", widgits=[]):
+    unlockedWeapons = []
+
+    def __init__(self, x, y, width, height, guiType="none", widgits=[]):
         self.pos = Vector(x, y)
         self.width, self.height = width, height
         self.hidden = False
         self.widgits = widgits
         self.guiType = guiType
-    
+
     def render(self):
-        pygame.draw.rect(screen, (50, 50, 50), Rect(self.pos.x, self.pos.y, self.width, self.height))
-        pygame.draw.rect(screen, (100, 100, 100), Rect(self.pos.x, self.pos.y, self.width, self.height), 5)
+        pygame.draw.rect(
+            screen, (50, 50, 50), Rect(self.pos.x, self.pos.y, self.width, self.height)
+        )
+        pygame.draw.rect(
+            screen,
+            (100, 100, 100),
+            Rect(self.pos.x, self.pos.y, self.width, self.height),
+            5,
+        )
         for widgit in self.widgits:
             widgit.update()
             widgit.render()
@@ -1523,12 +1647,22 @@ class Gui:
         exec(f"self.{self.guiType}()")
 
     def setWidgitRequirements(self, dependentWidgitIndex, independentWidgitIndex):
-        self.widgits[dependentWidgitIndex].lockStatus = not self.widgits[independentWidgitIndex].selectedStatus or self.widgits[independentWidgitIndex].lockStatus
+        self.widgits[dependentWidgitIndex].lockStatus = (
+            not self.widgits[independentWidgitIndex].selectedStatus
+            or self.widgits[independentWidgitIndex].lockStatus
+        )
 
     @staticmethod
     def guiFromTemplate(x, y, guiType):
         guiTemplate = guiConstants[guiType]
-        return Gui(x, y, guiTemplate.width, guiTemplate.height, guiType, Widgit.fromArray(guiTemplate.widgits, Vector(x, y), "none"))
+        return Gui(
+            x,
+            y,
+            guiTemplate.width,
+            guiTemplate.height,
+            guiType,
+            Widgit.fromArray(guiTemplate.widgits, Vector(x, y), "none"),
+        )
 
     def weaponSelect(self):
         for i in range(1, 4):
@@ -1545,10 +1679,21 @@ class Gui:
         for i in range(19, 28):
             self.setWidgitRequirements(i, i - 9)
 
+        for widgit in self.widgits:
+            widgit.image = getImage(f"assets/weapons/{weapons[widgit.index]}.png")
+
+        Gui.unlockedWeapons = []
+
+        for i in range(len(self.widgits)):
+            if self.widgits[i].selectedStatus:
+                Gui.unlockedWeapons.append(weapons[i])
+
 
 player = Controller()
 
-testGui = Gui.guiFromTemplate(10, 10, "weaponSelect")
+testGui = Gui.guiFromTemplate(100, 100, "weaponSelect")
+testGui.widgits[0].selectedStatus = True
+
 
 def draw():
     global weaponSelection
@@ -1567,15 +1712,17 @@ def draw():
 
     if l_tick == 1:
         weaponSelection += 1
-        if weaponSelection >= len(weapons):
-            weaponSelection = 0
-        print(weapons[weaponSelection])
 
     if k_tick == 1:
         weaponSelection -= 1
-        if weaponSelection < 0:
-            weaponSelection = len(weapons) - 1
-        print(weapons[weaponSelection])
+
+    if weaponSelection >= len(Gui.unlockedWeapons):
+        weaponSelection = 0
+    elif weaponSelection < 0:
+        weaponSelection = len(Gui.unlockedWeapons) - 1
+
+    if z_tick == 1:
+        print(Gui.unlockedWeapons[weaponSelection])
 
     closestPos = -1
     closestDistance = 50
@@ -1599,17 +1746,17 @@ def draw():
             shootAngle,
             0,
             0,
-            weapons[weaponSelection],
+            Gui.unlockedWeapons[weaponSelection],
             player,
         )
 
     player.controller()
     player.update()
     player.render()
-    #player.findClosestWall().renderPoint()
+    # player.findClosestWall().renderPoint()
 
-    #graphVelocity()
-    #player.vel.render(player.pos, 15)
+    # graphVelocity()
+    # player.vel.render(player.pos, 15)
 
     projectilesCopy = []
     projectilesRemoved = 0
@@ -1639,7 +1786,10 @@ def draw():
 
     testGui.render()
 
-    #player.mouseLine.renderBoundedLines()
+    # player.mouseLine.renderBoundedLines()
+
+    renderImage(getImage("assets/weapons/laserCannon.png"), 0, 0, 1)
+
 
 while running:
     for event in pygame.event.get():
